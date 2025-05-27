@@ -38,6 +38,18 @@ function displayMessage(element, message, type = 'error') {
     }
 }
 
+// --- Hàm trợ giúp để kiểm tra đường dẫn hiện tại (MỚI) ---
+// Giúp xử lý các đường dẫn dạng /repo-name/file.html trên GitHub Pages
+const isCurrentPage = (fileName) => {
+    // Kiểm tra xem pathname có kết thúc bằng /fileName không
+    // Hoặc nếu nó là thư mục gốc của trang web (ví dụ: yourusername.github.io/)
+    // Hoặc nếu nó là /index.html (cũng có thể là trang gốc)
+    return window.location.pathname.endsWith(`/${fileName}`) ||
+           window.location.pathname === '/' ||
+           window.location.pathname.endsWith('/index.html');
+};
+
+
 // --- Xử lý trạng thái xác thực người dùng khi tải trang ---
 // Listener này sẽ chạy mỗi khi trạng thái đăng nhập thay đổi (đăng nhập, đăng xuất)
 onAuthStateChanged(auth, async (user) => {
@@ -56,23 +68,30 @@ onAuthStateChanged(auth, async (user) => {
                 // Chắc chắn kiểm tra giá trị của role
                 if (typeof userData.role === 'string') { // Kiểm tra xem role có phải là chuỗi không
                     if (userData.role === 'admin') {
-                        console.log('Role recognized as admin. Redirecting to dashboard.html');
-                        // Chỉ chuyển hướng nếu chưa ở trang dashboard.html
-                        if (window.location.pathname !== '/dashboard.html' && window.location.pathname !== '/index.html') {
+                        console.log('Role recognized as admin.');
+                        // CHỈ CHUYỂN HƯỚNG NẾU KHÔNG PHẢI LÀ TRANG ĐÍCH
+                        if (!isCurrentPage('dashboard.html')) {
+                            console.log('Redirecting to dashboard.html');
                             window.location.href = 'dashboard.html';
+                        } else {
+                            console.log('Already on dashboard page, no redirect needed.');
                         }
                     } else if (userData.role === 'employee') {
-                        console.log('Role recognized as employee. Redirecting to employee-dashboard.html');
-                        // Chỉ chuyển hướng nếu chưa ở trang employee-dashboard.html
-                        if (window.location.pathname !== '/employee-dashboard.html') {
+                        console.log('Role recognized as employee.');
+                        // CHỈ CHUYỂN HƯỚNG NẾU KHÔNG PHẢI LÀ TRANG ĐÍCH
+                        if (!isCurrentPage('employee-dashboard.html')) {
+                            console.log('Redirecting to employee-dashboard.html');
                             window.location.href = 'employee-dashboard.html';
+                        } else {
+                            console.log('Already on employee dashboard page, no redirect needed.');
                         }
                     } else {
                         // Vai trò không phải 'admin' hoặc 'employee'
                         console.warn('Unknown user role:', userData.role);
                         displayMessage(errorMessage, 'Vai trò người dùng không xác định. Vui lòng liên hệ quản trị viên.', 'error');
                         await signOut(auth); // Đăng xuất người dùng với vai trò không xác định
-                        if (window.location.pathname !== '/login.html') {
+                        // CHUYỂN HƯỚNG ĐẾN TRANG ĐĂNG NHẬP NẾU KHÔNG PHẢI LÀ TRANG ĐĂNG NHẬP
+                        if (!isCurrentPage('login.html')) {
                             window.location.href = 'login.html';
                         }
                     }
@@ -81,7 +100,7 @@ onAuthStateChanged(auth, async (user) => {
                     console.error('User role field is not a string or is missing:', userData.role);
                     displayMessage(errorMessage, 'Dữ liệu vai trò người dùng không hợp lệ. Vui lòng liên hệ quản trị viên.', 'error');
                     await signOut(auth);
-                    if (window.location.pathname !== '/login.html') {
+                    if (!isCurrentPage('login.html')) {
                         window.location.href = 'login.html';
                     }
                 }
@@ -91,7 +110,7 @@ onAuthStateChanged(auth, async (user) => {
                 console.warn('User document not found in Firestore for UID:', user.uid);
                 displayMessage(errorMessage, 'Thông tin người dùng không tìm thấy trong Firestore. Vui lòng liên hệ quản trị viên.', 'error');
                 await signOut(auth); // Đăng xuất nếu không có dữ liệu vai trò
-                if (window.location.pathname !== '/login.html') {
+                if (!isCurrentPage('login.html')) {
                     window.location.href = 'login.html';
                 }
             }
@@ -100,16 +119,19 @@ onAuthStateChanged(auth, async (user) => {
             console.error("Lỗi khi lấy dữ liệu vai trò từ Firestore:", firestoreError);
             displayMessage(errorMessage, `Lỗi hệ thống khi xác thực vai trò: ${firestoreError.message}. Vui lòng thử lại.`, 'error');
             await signOut(auth); // Đăng xuất nếu gặp lỗi Firestore
-            if (window.location.pathname !== '/login.html') {
+            if (!isCurrentPage('login.html')) {
                 window.location.href = 'login.html';
             }
         }
     } else {
         // Không có người dùng nào đăng nhập
         console.log('No user is signed in.');
-        // Chỉ chuyển hướng đến login.html nếu không phải là trang login, index hoặc trang gốc
-        if (window.location.pathname !== '/login.html' && window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
+        // CHỈ CHUYỂN HƯỚNG ĐẾN login.html NẾU KHÔNG PHẢI LÀ TRANG ĐĂNG NHẬP HOẶC TRANG GỐC
+        if (!isCurrentPage('login.html')) { // Điều kiện này đã được sửa đổi
+            console.log('Redirecting to login.html');
             window.location.href = 'login.html';
+        } else {
+            console.log('Already on login page, no redirect needed.');
         }
     }
 });
@@ -144,10 +166,10 @@ if (loginForm) {
                 if (typeof userData.role === 'string') {
                     if (userData.role === 'admin') {
                         displayMessage(errorMessage, 'Đăng nhập thành công! Chuyển hướng...', 'success');
-                        window.location.href = 'dashboard.html';
+                        window.location.href = 'dashboard.html'; // Chuyển hướng trực tiếp sau đăng nhập
                     } else if (userData.role === 'employee') {
                         displayMessage(errorMessage, 'Đăng nhập thành công! Chuyển hướng...', 'success');
-                        window.location.href = 'employee-dashboard.html';
+                        window.location.href = 'employee-dashboard.html'; // Chuyển hướng trực tiếp sau đăng nhập
                     } else {
                         console.warn('Unknown user role after login attempt:', userData.role);
                         displayMessage(errorMessage, 'Vai trò người dùng không xác định. Vui lòng liên hệ quản trị viên.', 'error');
@@ -270,19 +292,3 @@ if (registerForm) {
         }
     });
 }
-
-// --- Xử lý Đăng xuất (chỉ áp dụng nếu bạn có nút đăng xuất trong các trang dashboard) ---
-// (Bạn có thể thêm event listener cho nút đăng xuất ở đây nếu muốn tập trung tất cả logic auth vào file này)
-// Ví dụ: const logoutButton = document.getElementById('logoutButton');
-// if (logoutButton) {
-//     logoutButton.addEventListener('click', async () => {
-//         try {
-//             await signOut(auth);
-//             console.log('User signed out successfully.');
-//             window.location.href = 'login.html'; // Redirect to login page
-//         } catch (error) {
-//             console.error('Error signing out:', error);
-//             // Có thể hiển thị thông báo lỗi nếu không thể đăng xuất
-//         }
-//     });
-// }
