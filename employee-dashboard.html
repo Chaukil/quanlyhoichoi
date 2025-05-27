@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Nhân viên</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="logo">
+                <h2>Nhân viên</h2>
+            </div>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="#" id="navEmployeeDashboard" class="active"><i class="fas fa-tachometer-alt"></i> Tổng quan</a></li>
+                    <li><a href="#" id="navEmployeeConsume"><i class="fas fa-cash-register"></i> Tiêu hao Hàng hóa</a></li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logoutButton"><i class="fas fa-sign-out-alt"></i> Đăng xuất</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="navbar">
+                <div class="navbar-left">
+                    <h1 id="pageTitle">Tổng quan Doanh thu</h1>
+                </div>
+                <div class="navbar-right">
+                    Xin chào, <strong id="userName">Nhân viên</strong>
+                </div>
+            </header>
+
+            <section id="employeeDashboardSection" class="content-section">
+                <h2>Tổng quan Doanh thu</h2>
+                <p class="section-description">Xem các số liệu tổng quan về doanh thu hàng ngày và hàng tháng.</p>
+                <div class="dashboard-summary">
+                    <div class="summary-card">
+                        <h3>Doanh thu Hôm nay</h3>
+                        <p id="dailyRevenue">0 VNĐ</p>
+                    </div>
+                    <div class="summary-card">
+                        <h3>Doanh thu Tháng này</h3>
+                        <p id="monthlyRevenue">0 VNĐ</p>
+                    </div>
+                </div>
+                <div class="dashboard-charts">
+                    <h3>Doanh thu 7 ngày gần nhất</h3>
+                    <canvas id="employeeRevenueChart" width="800" height="400"></canvas>
+                </div>
+            </section>
+
+            <section id="employeeConsumeSection" class="content-section hidden">
+                <h2>Tiêu hao Hàng hóa</h2>
+                <p class="section-description">Ghi nhận số lượng hàng hóa đã được sử dụng hoặc bán ra.</p>
+                <div class="data-table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Tên hàng hóa</th>
+                                <th>Giá bán</th>
+                                <th>Tồn kho hiện tại</th>
+                                <th>Số lượng tiêu hao</th>
+                            </tr>
+                        </thead>
+                        <tbody id="consumableProductsTableBody">
+                            </tbody>
+                    </table>
+                </div>
+                <button type="button" id="saveConsumptionButton" class="action-button" style="margin-top: 20px;"><i class="fas fa-save"></i> Lưu tiêu hao</button>
+                <span id="consumeStatusMessage" class="status-message"></span>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="module" src="js/employee-app.js"></script>
+</body>
+</html>

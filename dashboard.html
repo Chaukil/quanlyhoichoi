@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Quản Lý Hàng Hóa</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="dashboard-wrapper"> <aside class="sidebar">
+            <div class="logo">
+                <h2>Quản Lý Hàng Hóa</h2>
+            </div>
+            <nav class="main-nav">
+                <ul>
+                    <li id="navDashboard"><a href="#"><i class="fas fa-chart-line"></i> Tổng quan</a></li>
+                    <li id="navProducts"><a href="#"><i class="fas fa-box-seam"></i> Quản lý Sản phẩm</a></li>
+                    <li id="navInventoryIn"><a href="#"><i class="fas fa-truck-loading"></i> Nhập kho</a></li>
+                    <li id="navInventoryHistory"><a href="#"><i class="fas fa-history"></i> Lịch sử Nhập kho</a></li>
+                    <li id="navConsume"><a href="#"><i class="fas fa-cash-register"></i> Tiêu hao Hàng hóa</a></li>
+                    <li id="navReports"><a href="#"><i class="fas fa-file-alt"></i> Báo cáo Doanh thu & Lợi nhuận</a></li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logoutButton"><i class="fas fa-sign-out-alt"></i> Đăng xuất</button>
+            </div>
+        </aside>
+
+        <div class="main-content-area"> <header class="navbar">
+                <div class="navbar-left">
+                    <button id="sidebarToggle" class="sidebar-toggle-button"><i class="fas fa-bars"></i></button>
+                    <h1 id="pageTitle">Tổng quan</h1>
+                </div>
+                <div class="navbar-right">
+                    Chào mừng, <strong id="userName">Admin</strong>!
+                </div>
+            </header>
+
+            <section id="dashboardSection" class="content-section">
+                <h2>Tổng quan Hoạt động</h2>
+                <p class="section-description">Xem tổng quan về doanh thu, tồn kho và các chỉ số quan trọng khác.</p>
+                <div class="dashboard-summary">
+                    <div class="summary-card">
+                        <h3>Doanh thu Hôm nay</h3>
+                        <p id="dailyRevenue">0 VNĐ</p>
+                    </div>
+                    <div class="summary-card">
+                        <h3>Doanh thu Tháng này</h3>
+                        <p id="monthlyRevenue">0 VNĐ</p>
+                    </div>
+                    <div class="summary-card">
+                        <h3>Số lượng SP tồn kho thấp</h3>
+                        <p id="lowStockCount">0</p>
+                    </div>
+                </div>
+                <div class="dashboard-charts">
+                    <h3>Doanh thu 7 ngày gần nhất</h3>
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </section>
+
+            <section id="productsSection" class="content-section hidden">
+                <h2>Quản lý Sản phẩm</h2>
+                <p class="section-description">Thêm mới, chỉnh sửa, xóa và theo dõi sản phẩm của bạn.</p>
+                <button id="addNewProductButton" class="action-button"><i class="fas fa-plus"></i> Thêm sản phẩm mới</button>
+                <div class="data-table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Tên Hàng Hóa</th>
+                                <th>Giá bán</th>
+                                <th>Tồn kho</th>
+                                <th>Tồn kho tối thiểu</th>
+                                <th>Trạng thái</th>
+                                <th>Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productsTableBody">
+                            </tbody>
+                    </table>
+                </div>
+                <span id="productStatusMessage" class="status-message"></span>
+            </section>
+
+            <section id="inventoryInSection" class="content-section hidden">
+                <h2>Nhập kho Hàng hóa</h2>
+                <p class="section-description">Thêm hàng hóa vào kho và cập nhật số lượng tồn kho.</p>
+                <div class="form-container">
+                    <h3>Thêm Hàng Nhập Kho</h3>
+                    <form id="addInventoryInForm">
+                        <div class="form-group">
+                            <label for="inventoryProductName">Tên Hàng Hóa:</label>
+                            <select id="inventoryProductName" class="full-width-select" required>
+                                </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="inventoryQuantity">Số lượng nhập:</label>
+                            <input type="number" id="inventoryQuantity" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="inventoryPrice">Giá nhập (VNĐ):</label>
+                            <input type="number" id="inventoryPrice" min="0" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="inventoryDate">Ngày nhập:</label>
+                            <input type="date" id="inventoryDate" required>
+                        </div>
+                        <button type="submit" class="action-button"><i class="fas fa-plus"></i> Thêm vào kho</button>
+                    </form>
+                    <span id="inventoryStatusMessage" class="status-message"></span>
+                </div>
+            </section>
+
+            <section id="inventoryHistorySection" class="content-section hidden">
+                <h2>Lịch sử Nhập kho</h2>
+                <p class="section-description">Xem lại tất cả các lần nhập kho đã ghi nhận.</p>
+                <div class="data-table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Ngày nhập</th>
+                                <th>Tên Hàng Hóa</th>
+                                <th>Số lượng</th>
+                                <th>Giá nhập</th>
+                                <th>Tổng giá trị</th>
+                                <th>Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryInHistoryTableBody">
+                            </tbody>
+                    </table>
+                </div>
+                <span id="inventoryHistoryStatusMessage" class="status-message"></span>
+            </section>
+
+            <section id="consumeSection" class="content-section hidden">
+                <h2>Tiêu hao Hàng hóa</h2>
+                <p class="section-description">Ghi nhận số lượng hàng hóa đã được bán hoặc tiêu hao.</p>
+                <div class="data-table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Tên Hàng Hóa</th>
+                                <th>Giá bán</th>
+                                <th>Tồn kho hiện tại</th>
+                                <th>Số lượng tiêu hao</th>
+                            </tr>
+                        </thead>
+                        <tbody id="consumableProductsTableBody">
+                            </tbody>
+                    </table>
+                </div>
+                <button id="saveConsumptionButton" class="action-button" style="margin-top: 20px;"><i class="fas fa-save"></i> Lưu tiêu hao</button>
+                <span id="consumeStatusMessage" class="status-message"></span>
+            </section>
+
+            <div id="revenue-report-section" class="content-section hidden">
+                <h2><i class="fas fa-chart-line"></i> Báo cáo Doanh thu</h2>
+                <p class="section-description">Xem tổng doanh thu dựa trên số lượng hàng hóa tiêu hao trong khoảng thời gian cụ thể.</p>
+            
+                <div class="report-filters">
+                    <div class="form-group">
+                        <label for="revenueReportPeriod">Chọn khoảng thời gian:</label>
+                        <select id="revenueReportPeriod" class="full-width-select">
+                            <option value="today">Hôm nay</option>
+                            <option value="this_week">Tuần này</option>
+                            <option value="this_month">Tháng này</option>
+                            <option value="this_year">Năm nay</option>
+                            <option value="custom">Tùy chỉnh ngày</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="revenueCustomDateGroup" style="display: none;">
+                        <label for="revenueStartDate">Từ ngày:</label>
+                        <input type="date" id="revenueStartDate" class="full-width-input">
+                        <label for="revenueEndDate">Đến ngày:</label>
+                        <input type="date" id="revenueEndDate" class="full-width-input">
+                    </div>
+                    <button id="generateReportButton" class="action-button"><i class="fas fa-file-invoice-dollar"></i> Tạo Báo cáo</button>
+                </div>
+            
+                <div id="revenueReportContent" class="report-content-display">
+                    <p>Vui lòng chọn khoảng thời gian và nhấp "Tạo Báo cáo" để xem doanh thu.</p>
+                </div>
+            </div>
+            
+            <div id="profit-report-section" class="content-section hidden">
+                <h2><i class="fas fa-dollar-sign"></i> Báo cáo Lợi nhuận</h2>
+                <p class="section-description">Tính toán lợi nhuận dựa trên tổng giá nhập kho và giá bán của hàng hóa tiêu hao trong một khoảng thời gian.</p>
+            
+                <div class="report-filters">
+                    <div class="form-group">
+                        <label for="profitReportPeriod">Chọn khoảng thời gian:</label>
+                        <select id="profitReportPeriod" class="full-width-select">
+                            <option value="today">Hôm nay</option>
+                            <option value="this_week">Tuần này</option>
+                            <option value="this_month">Tháng này</option>
+                            <option value="this_year">Năm nay</option>
+                            <option value="custom">Tùy chỉnh ngày</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="profitCustomDateGroup" style="display: none;">
+                        <label for="profitStartDate">Từ ngày:</label>
+                        <input type="date" id="profitStartDate" class="full-width-input">
+                        <label for="profitEndDate">Đến ngày:</label>
+                        <input type="date" id="profitEndDate" class="full-width-input">
+                    </div>
+                    <button id="generateProfitReportBtn" class="action-button"><i class="fas fa-money-bill-wave"></i> Tạo Báo cáo Lợi nhuận</button>
+                </div>
+            
+                <div id="profitReportContent" class="report-content-display">
+                    <p>Vui lòng chọn khoảng thời gian và nhấp "Tạo Báo cáo Lợi nhuận" để xem lợi nhuận.</p>
+                </div>
+            </div>
+
+        </div> </div> <div id="productModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h3 id="modalTitle">Thêm Sản phẩm</h3>
+            <form id="addProductForm">
+                <div class="form-group">
+                    <label for="productName">Tên Hàng Hóa:</label>
+                    <input type="text" id="productName" required>
+                </div>
+                <div class="form-group">
+                    <label for="productPrice">Giá bán (VNĐ):</label>
+                    <input type="number" id="productPrice" min="0" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="productUnit">Đơn vị:</label>
+                    <input type="text" id="productUnit" required>
+                </div>
+                <div class="form-group">
+                    <label for="productMinStock">Tồn kho tối thiểu:</label>
+                    <input type="number" id="productMinStock" min="0" required>
+                </div>
+                <button type="submit" id="saveProductButton" class="action-button"><i class="fas fa-plus"></i> Thêm sản phẩm</button>
+                <span id="productStatusMessage" class="status-message"></span>
+            </form>
+        </div>
+    </div>
+
+    <script type="module" src="js/firebase-config.js"></script> <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

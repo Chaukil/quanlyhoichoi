@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng ký - Hệ thống quản lý kho</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <h2>Đăng ký tài khoản</h2>
+            <form id="registerForm">
+                <div class="input-group">
+                    <i class="fas fa-envelope"></i>
+                    <input type="email" id="registerEmail" placeholder="Email" required>
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="registerPassword" placeholder="Mật khẩu (ít nhất 6 ký tự)" required>
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="registerConfirmPassword" placeholder="Xác nhận mật khẩu" required>
+                </div>
+                <button type="submit" id="registerButton">Đăng ký</button>
+            </form>
+            <p class="auth-status-message" id="registerStatusMessage"></p>
+            <p>Đã có tài khoản? <a href="login.html">Đăng nhập ngay</a></p>
+        </div>
+    </div>
+    <script type="module" src="js/register.js"></script>
+</body>
+</html>
