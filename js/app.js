@@ -1,10 +1,8 @@
 // js/app.js
-// File này chứa toàn bộ logic cho trang Dashboard của quản trị viên.
-// Nó giả định người dùng đã được xác thực và có vai trò 'admin'
-// (việc xác thực và chuyển hướng được xử lý bởi auth.js).
+// File này chứa toàn bộ logic cho trang Dashboard.
+// Toàn bộ chức năng đăng nhập, đăng ký, và phân quyền đã được loại bỏ.
 
-import { auth, db } from './firebase-config.js';
-import { signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { db } from './firebase-config.js'; // Chỉ import db, không còn auth
 import {
     collection,
     getDocs,
@@ -21,9 +19,7 @@ import {
 
 // --- Khai báo các phần tử DOM ---
 // Sử dụng kiểm tra null để đảm bảo phần tử tồn tại trước khi thao tác
-const logoutButton = document.getElementById('logoutButton');
 const pageTitle = document.getElementById('pageTitle');
-const userName = document.getElementById('userName');
 
 // Điều hướng Sidebar
 const navDashboard = document.getElementById('navDashboard');
@@ -32,6 +28,8 @@ const navInventoryIn = document.getElementById('navInventoryIn');
 const navInventoryHistory = document.getElementById('navInventoryHistory');
 const navConsume = document.getElementById('navConsume');
 const navReports = document.getElementById('navReports');
+const navSettings = document.getElementById('navSettings'); // Thêm navSettings
+const navLogout = document.getElementById('navLogout'); // Thêm navLogout
 
 // Phần tử Sidebar
 const sidebar = document.querySelector('.sidebar');
@@ -44,252 +42,931 @@ const productsSection = document.getElementById('productsSection');
 const inventoryInSection = document.getElementById('inventoryInSection');
 const inventoryHistorySection = document.getElementById('inventoryHistorySection');
 const consumeSection = document.getElementById('consumeSection');
-const reportsSection = document.getElementById('reportsSection'); // Đây là phần tử chính cho báo cáo
+const reportsSection = document.getElementById('reportsSection');
+const settingsSection = document.getElementById('settingsSection'); // Thêm settingsSection
 
-// Các phần tử cho Dashboard Summary
-const dailyRevenueElem = document.getElementById('dailyRevenue');
-const monthlyRevenueElem = document.getElementById('monthlyRevenue');
-const lowStockCountElem = document.getElementById('lowStockCount');
-const revenueChartCanvas = document.getElementById('revenueChart');
-let revenueChart; // Để giữ thể hiện của Chart.js
+// Báo cáo - CẬP NHẬT ID Ở ĐÂY
+const reportPeriodSelect = document.getElementById('reportPeriod'); // Đã thay đổi ID từ reportTypeSelect
+const customDateRangeDiv = document.getElementById('customDateRange'); // ID của div chứa ngày tùy chỉnh
+const reportStartDateInput = document.getElementById('startDate'); // Đã thay đổi ID từ reportStartDate
+const reportEndDateInput = document.getElementById('endDate'); // Đã thay đổi ID từ reportEndDate
+const generateReportButton = document.getElementById('generateReportButton');
+const profitReportContent = document.getElementById('profitReportContent'); // Vẫn là profitReportContent cho báo cáo
 
-// Các phần tử cho Quản lý Sản phẩm
-const addNewProductButton = document.getElementById('addNewProductButton');
-const productModal = document.getElementById('productModal');
-const closeButton = productModal ? productModal.querySelector('.close-button') : null; // Kiểm tra null
-const modalTitle = document.getElementById('modalTitle');
-
-const addProductForm = document.getElementById('addProductForm');
-const productNameInput = document.getElementById('productName');
-const productPriceInput = document.getElementById('productPrice');
-const productUnitInput = document.getElementById('productUnit');
-const productMinStockInput = document.getElementById('productMinStock');
+// Sản phẩm
+const addProductButton = document.getElementById('addProductButton');
+const productSearchInput = document.getElementById('productSearch'); // Đã thay đổi từ productSearchInput
 const productsTableBody = document.getElementById('productsTableBody');
-const productStatusMessage = document.getElementById('productStatusMessage');
+
+// Modal Sản phẩm
+const productModal = document.getElementById('productModal');
+const closeButton = document.querySelector('.modal .close-button');
+const modalTitle = document.getElementById('modalTitle');
+const addProductForm = document.getElementById('addProductForm');
+const productIdInput = document.getElementById('productId'); // Đã thay đổi từ productId
+const productNameInput = document.getElementById('productName'); // Đã thay đổi từ productName
+const productPriceInput = document.getElementById('productPrice'); // Đã thay đổi từ productPrice
+const productUnitInput = document.getElementById('productUnit'); // Đã thay đổi từ productUnit
+const productMinStockInput = document.getElementById('productMinStock'); // Đã thay đổi từ productMinStock
 const saveProductButton = document.getElementById('saveProductButton');
-let editingProductId = null;
+const productStatusMessage = document.getElementById('productStatusMessage');
 
-// Các phần tử cho Nhập kho
-const addInventoryInForm = document.getElementById('addInventoryInForm');
-const inventoryProductNameSelect = document.getElementById('inventoryProductName');
-const inventoryQuantityInput = document.getElementById('inventoryQuantity');
-const inventoryPriceInput = document.getElementById('inventoryPrice');
-const inventoryDateInput = document.getElementById('inventoryDate');
-const inventoryStatusMessage = document.getElementById('inventoryStatusMessage');
+// Nhập kho
+const inventoryInProductSelect = document.getElementById('inventoryInProductSelect'); // Đã thay đổi từ inventoryProductSelect
+const inventoryInQuantityInput = document.getElementById('inventoryInQuantity'); // Đã thay đổi từ inventoryQuantityInput
+const inventoryInCostInput = document.getElementById('inventoryInCost'); // Đã thay đổi từ inventoryPriceInput
+const inventoryDateInput = document.getElementById('inventoryDateInput'); // Cần kiểm tra xem có còn dùng không
+const saveInventoryInButton = document.getElementById('saveInventoryInButton'); // Đã thay đổi từ saveInventoryButton
+const inventoryInStatusMessage = document.getElementById('inventoryInStatusMessage'); // Đã thay đổi từ inventoryStatusMessage
 
-// Các phần tử cho Lịch sử Nhập kho
-const inventoryInHistoryTableBody = document.getElementById('inventoryInHistoryTableBody');
-const inventoryHistoryStatusMessage = document.getElementById('inventoryHistoryStatusMessage');
+// Lịch sử nhập kho
+const inventoryHistoryTableBody = document.getElementById('inventoryHistoryTableBody');
 
-// Các phần tử cho Tiêu hao Hàng hóa
+// Tiêu hao
 const consumableProductsTableBody = document.getElementById('consumableProductsTableBody');
 const saveConsumptionButton = document.getElementById('saveConsumptionButton');
 const consumeStatusMessage = document.getElementById('consumeStatusMessage');
+const consumptionHistoryTableBody = document.getElementById('consumptionHistoryTableBody'); // Thêm phần lịch sử tiêu hao
 
-// Các phần tử cho Báo cáo
-const reportTypeSelect = document.getElementById('reportType');
-const reportStartDateInput = document.getElementById('reportStartDate');
-const reportEndDateInput = document.getElementById('reportEndDate');
-const generateReportButton = document.getElementById('generateReportButton'); // Nút tạo báo cáo doanh thu
-const reportContent = document.getElementById('reportContent'); // Khu vực hiển thị báo cáo chung
-const reportMonthInput = document.getElementById('reportMonth');
-const reportYearInput = document.getElementById('reportYear');
-const reportDailyDateInput = document.getElementById('reportDailyDate');
+// Pagination Controls (Sản phẩm)
+const prevProductsPageButton = document.getElementById('prevProductsPage');
+const nextProductsPageButton = document.getElementById('nextProductsPage');
+const currentProductsPageSpan = document.getElementById('currentProductsPage');
+const totalPagesProductsSpan = document.getElementById('totalPagesProducts');
 
-// Các phần tử cho Báo cáo Lợi nhuận
-const profitReportFilter = document.getElementById('profitReportFilter');
-const profitInventoryInStartDateInput = document.getElementById('profitInventoryInStartDate');
-const profitInventoryInEndDateInput = document.getElementById('profitInventoryInEndDate');
-const profitConsumeStartDateInput = document.getElementById('profitConsumeStartDate');
-const profitConsumeEndDateInput = document.getElementById('profitConsumeEndDate');
-const generateProfitReportBtn = document.getElementById('generateProfitReportBtn'); // Nút tạo báo cáo lợi nhuận
-const profitReportContent = document.getElementById('profitReportContent'); // Khu vực hiển thị báo cáo lợi nhuận
+// Pagination Controls (Lịch sử nhập kho)
+const prevInventoryHistoryPageButton = document.getElementById('prevInventoryHistoryPage');
+const nextInventoryHistoryPageButton = document.getElementById('nextInventoryHistoryPage');
+const currentInventoryHistoryPageSpan = document.getElementById('currentInventoryHistoryPage');
+const totalPagesInventoryHistorySpan = document.getElementById('totalPagesInventoryHistory');
 
-// --- Helper Functions ---
+// Pagination Controls (Lịch sử tiêu hao)
+const prevConsumptionHistoryPageButton = document.getElementById('prevConsumptionHistoryPage');
+const nextConsumptionHistoryPageButton = document.getElementById('nextConsumptionHistoryPage');
+const currentConsumptionHistoryPageSpan = document.getElementById('currentConsumptionHistoryPage');
+const totalPagesConsumptionHistorySpan = document.getElementById('totalPagesConsumptionHistory');
 
-// Hàm ẩn tất cả các phần nội dung và hiển thị phần đang hoạt động
-function showSection(sectionToShow, title) {
-    document.querySelectorAll('.content-section').forEach(section => {
-        section.classList.add('hidden');
-    });
-    if (sectionToShow) { // Kiểm tra tồn tại của sectionToShow
-        sectionToShow.classList.remove('hidden');
+// --- Biến chung ---
+let currentProductsPage = 1;
+const productsPerPage = 10;
+let currentInventoryHistoryPage = 1;
+const inventoryHistoryPerPage = 10;
+let currentConsumptionHistoryPage = 1;
+const consumptionHistoryPerPage = 10;
+
+// --- Hàm chung ---
+
+function showSection(section, title) {
+    // Ẩn tất cả các section
+    document.querySelectorAll('.content-section').forEach(sec => sec.classList.add('hidden'));
+    // Hiển thị section mong muốn
+    if (section) {
+        section.classList.remove('hidden');
     }
-    if (pageTitle) { // Kiểm tra tồn tại của pageTitle
+    // Cập nhật tiêu đề trang
+    if (pageTitle) {
         pageTitle.textContent = title;
-    }
-
-    // Cập nhật lớp 'active' trên các liên kết điều hướng
-    document.querySelectorAll('.main-nav li a').forEach(link => {
-        link.classList.remove('active');
-    });
-    // Thêm lớp 'active' cho <li> cha của liên kết đã nhấp
-    if (sectionToShow === dashboardSection && navDashboard) navDashboard.querySelector('a').classList.add('active');
-    else if (sectionToShow === productsSection && navProducts) navProducts.querySelector('a').classList.add('active');
-    else if (sectionToShow === inventoryInSection && navInventoryIn) navInventoryIn.querySelector('a').classList.add('active');
-    else if (sectionToShow === inventoryHistorySection && navInventoryHistory) navInventoryHistory.querySelector('a').classList.add('active');
-    else if (sectionToShow === consumeSection && navConsume) navConsume.querySelector('a').classList.add('active');
-    else if (sectionToShow === reportsSection && navReports) navReports.querySelector('a').classList.add('active');
-
-    // Đóng sidebar trên thiết bị di động sau khi điều hướng
-    if (window.innerWidth <= 992) {
-        hideSidebar();
     }
 }
 
-// Hàm hiển thị thông báo trạng thái
 function displayStatusMessage(element, message, type) {
-    if (element) { // Kiểm tra tồn tại của phần tử
-        element.innerHTML = message; // Sử dụng innerHTML để hỗ trợ hiển thị <br>
+    if (element) {
+        element.textContent = message;
         element.className = `status-message ${type}`;
         setTimeout(() => {
             element.textContent = '';
             element.className = 'status-message';
-        }, 5000); // Tăng thời gian hiển thị thông báo
+        }, 5000);
     }
 }
 
-// --- Hàm Modal ---
-function openProductModal(isEdit = false, productId = null) {
-    if (productModal) { // Kiểm tra tồn tại của productModal
-        productModal.classList.remove('hidden');
-        productModal.classList.add('show');
-    }
-    if (addProductForm) { // Kiểm tra tồn tại của addProductForm
-        addProductForm.reset();
-    }
-    if (productStatusMessage) { // Kiểm tra tồn tại của productStatusMessage
-        productStatusMessage.textContent = '';
-    }
+// --- Dashboard Logic ---
 
-    if (modalTitle && saveProductButton) { // Kiểm tra tồn tại của modalTitle và saveProductButton
-        if (isEdit) {
-            modalTitle.textContent = 'Chỉnh sửa Sản phẩm';
-            saveProductButton.innerHTML = '<i class="fas fa-save"></i> Cập nhật sản phẩm';
-            editingProductId = productId;
-        } else {
-            modalTitle.textContent = 'Thêm Sản phẩm';
-            saveProductButton.innerHTML = '<i class="fas fa-plus"></i> Thêm sản phẩm';
-            editingProductId = null;
-        }
+async function loadDashboardKPIs() {
+    // Logic tải KPI
+    const productsCol = collection(db, 'products');
+    try {
+        const querySnapshot = await getDocs(productsCol);
+        let totalProducts = 0;
+        let totalStockQuantity = 0;
+        let totalStockValue = 0;
+        let lowStockCount = 0;
+        const productNames = [];
+        const productStocks = [];
+
+        querySnapshot.forEach(doc => {
+            const product = doc.data();
+            totalProducts++;
+            totalStockQuantity += product.stock || 0;
+            totalStockValue += (product.stock || 0) * (product.price || 0); // Giả sử giá bán để tính giá trị tồn kho
+            if (product.stock < product.minStock) {
+                lowStockCount++;
+            }
+            productNames.push(product.name);
+            productStocks.push(product.stock || 0);
+        });
+
+        if (document.getElementById('totalProductsCount')) document.getElementById('totalProductsCount').textContent = totalProducts;
+        if (document.getElementById('totalStockQuantity')) document.getElementById('totalStockQuantity').textContent = totalStockQuantity;
+        if (document.getElementById('totalStockValue')) document.getElementById('totalStockValue').textContent = totalStockValue.toLocaleString('vi-VN') + ' VNĐ';
+        if (document.getElementById('lowStockCount')) document.getElementById('lowStockCount').textContent = lowStockCount;
+
+        // Cập nhật biểu đồ tồn kho (nếu có)
+        updateStockChart(productNames, productStocks);
+    } catch (error) {
+        console.error("Lỗi khi tải KPIs dashboard:", error);
     }
 }
 
-function closeProductModal() {
-    if (productModal) { // Kiểm tra tồn tại của productModal
-        productModal.classList.remove('show');
-        productModal.classList.add('hidden');
-    }
-    editingProductId = null;
-    if (addProductForm) { // Kiểm tra tồn tại của addProductForm
-        addProductForm.reset();
-    }
-    if (productStatusMessage) { // Kiểm tra tồn tại của productStatusMessage
-        productStatusMessage.textContent = '';
-    }
-}
+let stockChartInstance;
+function updateStockChart(labels, data) {
+    const ctx = document.getElementById('stockChart');
+    if (!ctx) return;
 
-// Event listeners cho modal
-if (closeButton) {
-    closeButton.addEventListener('click', closeProductModal);
-}
-if (productModal) {
-    window.addEventListener('click', (event) => {
-        if (event.target === productModal) {
-            closeProductModal();
+    if (stockChartInstance) {
+        stockChartInstance.destroy();
+    }
+
+    stockChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Tồn kho hiện tại',
+                data: data,
+                backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Số lượng tồn kho'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Tên Sản phẩm'
+                    }
+                }
+            }
         }
     });
 }
 
-// --- Chức năng chuyển đổi Sidebar ---
-function toggleSidebar() {
-    if (sidebar && mainContentArea) {
-        sidebar.classList.toggle('hidden');
+// --- Product Management Logic ---
 
-        if (sidebar.classList.contains('hidden')) {
-            mainContentArea.classList.add('full-width');
-        } else {
-            mainContentArea.classList.remove('full-width');
+async function loadProducts(page = 1, searchQuery = '') {
+    currentProductsPage = page;
+    if (!productsTableBody) return;
+    productsTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Đang tải sản phẩm...</td></tr>';
+
+    try {
+        let productsRef = collection(db, 'products');
+        let q = query(productsRef, orderBy('name'));
+
+        if (searchQuery) {
+            // Firebase không hỗ trợ tìm kiếm substring trực tiếp hoặc case-insensitive hoàn toàn trên client-side cho `orderBy`
+            // Bạn sẽ cần lọc kết quả sau khi lấy về, hoặc sử dụng dịch vụ tìm kiếm bên ngoài (vd: Algolia, ElasticSearch)
+            // hoặc tìm kiếm chính xác. Ở đây, tôi sẽ lọc sau khi lấy về.
         }
 
-        if (window.innerWidth <= 992) {
-            sidebar.classList.toggle('show');
-        } else {
-            sidebar.classList.remove('show');
+        const querySnapshot = await getDocs(q);
+        let products = [];
+        querySnapshot.forEach(doc => {
+            products.push({ id: doc.id, ...doc.data() });
+        });
+
+        if (searchQuery) {
+            const lowerCaseSearchQuery = searchQuery.toLowerCase();
+            products = products.filter(p => p.name.toLowerCase().includes(lowerCaseSearchQuery));
         }
-    }
-}
 
-function hideSidebar() {
-    if (sidebar && mainContentArea) {
-        sidebar.classList.add('hidden');
-        sidebar.classList.remove('show');
-        mainContentArea.classList.remove('full-width');
-    }
-}
+        const totalProducts = products.length;
+        const totalPages = Math.ceil(totalProducts / productsPerPage);
+        if (totalPagesProductsSpan) totalPagesProductsSpan.textContent = totalPages > 0 ? totalPages : 1;
+        if (currentProductsPageSpan) currentProductsPageSpan.textContent = currentProductsPage;
 
-// Thêm event listener cho nút chuyển đổi
-if (sidebarToggle) {
-    sidebarToggle.addEventListener('click', toggleSidebar);
-}
+        const startIndex = (currentProductsPage - 1) * productsPerPage;
+        const endIndex = startIndex + productsPerPage;
+        const paginatedProducts = products.slice(startIndex, endIndex);
 
-// Điều chỉnh sidebar khi thay đổi kích thước cửa sổ
-window.addEventListener('resize', () => {
-    if (sidebar && mainContentArea) {
-        if (window.innerWidth > 992) {
-            sidebar.classList.remove('hidden', 'show');
-            mainContentArea.classList.remove('full-width');
-        } else {
-            if (!sidebar.classList.contains('show')) {
-                sidebar.classList.add('hidden');
+        productsTableBody.innerHTML = '';
+        if (paginatedProducts.length === 0) {
+            productsTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Không tìm thấy sản phẩm nào.</td></tr>';
+            return;
+        }
+
+        paginatedProducts.forEach(product => {
+            const row = productsTableBody.insertRow();
+            row.setAttribute('data-id', product.id);
+
+            // Kiểm tra tồn kho thấp
+            const isLowStock = (product.stock !== undefined && product.minStock !== undefined) && (product.stock <= product.minStock);
+            if (isLowStock) {
+                row.classList.add('low-stock-row'); // Thêm lớp CSS cho hàng tồn kho thấp
             }
-            mainContentArea.classList.remove('full-width');
+            
+            // Xây dựng các nút hành động
+            let actionsHtml = `
+                <button class="edit-product-button action-button small" data-id="${product.id}"><i class="fas fa-edit"></i> Sửa</button>
+                <button class="delete-product-button action-button small danger" data-id="${product.id}"><i class="fas fa-trash-alt"></i> Xóa</button>
+            `;
+            if (isLowStock) {
+                // Thêm nút "Nhập kho" nếu tồn kho thấp
+                actionsHtml += `
+                    <button class="restock-product-button action-button small primary"
+                            data-id="${product.id}"
+                            data-name="${product.name}"
+                            title="Nhập kho sản phẩm này do tồn kho thấp">
+                        <i class="fas fa-truck-loading"></i> Nhập kho
+                    </button>
+                `;
+            }
+
+            row.innerHTML = `
+                <td>${product.name} ${isLowStock ? '<i class="fas fa-exclamation-triangle low-stock-icon" title="Tồn kho thấp!"></i>' : ''}</td>
+                <td>${product.price ? product.price.toLocaleString('vi-VN') : '0'} VNĐ</td>
+                <td>${product.unit || ''}</td>
+                <td>${product.stock || 0}</td>
+                <td>${product.minStock || 0}</td>
+                <td>${isLowStock ? 'Cần nhập' : 'Ổn định'}</td> <td class="actions">
+                    ${actionsHtml}
+                </td>
+            `;
+        });
+
+        // Gắn sự kiện cho các nút Edit và Delete
+        document.querySelectorAll('.edit-product-button').forEach(button => {
+            button.addEventListener('click', (e) => editProduct(e.target.dataset.id));
+        });
+        document.querySelectorAll('.delete-product-button').forEach(button => {
+            button.addEventListener('click', (e) => deleteProduct(e.target.dataset.id));
+        });
+        document.querySelectorAll('.restock-product-button').forEach(button => {
+            button.addEventListener('click', (e) => restockProduct(e.target.dataset.id, e.target.dataset.name));
+        });
+
+        if (prevProductsPageButton) prevProductsPageButton.disabled = currentProductsPage === 1;
+        if (nextProductsPageButton) nextProductsPageButton.disabled = currentProductsPage === totalPages;
+
+    } catch (error) {
+        console.error("Lỗi khi tải sản phẩm:", error);
+        productsTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Lỗi khi tải sản phẩm.</td></tr>';
+    }
+}
+
+async function restockProduct(productId, productName) {
+    // Chuyển đến phần nhập kho
+    showSection(inventoryInSection, 'Nhập kho');
+
+    // Đặt sản phẩm và số lượng mặc định (ví dụ: 1)
+    if (inventoryInProductSelect) {
+        // Đảm bảo các sản phẩm đã được tải trước khi đặt giá trị
+        await loadProductsForInventoryIn(); // Tải lại danh sách sản phẩm để đảm bảo tùy chọn có sẵn
+        inventoryInProductSelect.value = productId; // Chọn sản phẩm trong dropdown
+
+        // Bạn có thể tùy chọn đặt số lượng nhập mặc định, ví dụ: 1 hoặc mức minStock của sản phẩm
+        if (inventoryInQuantityInput) {
+            // Lấy thông tin sản phẩm để đặt số lượng mặc định
+            const productRef = doc(db, 'products', productId);
+            const productSnap = await getDoc(productRef);
+            if (productSnap.exists()) {
+                const product = productSnap.data();
+                // Đặt số lượng nhập mặc định để đạt minStock + 1 hoặc một giá trị cố định
+                const quantityNeeded = (product.minStock || 0) - (product.stock || 0) + 10; // Ví dụ: nhập thêm 10 đơn vị vượt mức tối thiểu
+                inventoryInQuantityInput.value = quantityNeeded > 0 ? quantityNeeded : 1;
+            } else {
+                inventoryInQuantityInput.value = '1';
+            }
         }
     }
+    // Đặt ngày nhập kho mặc định là ngày hiện tại
+    if (inventoryDateInput) {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        inventoryDateInput.value = `${year}-${month}-${day}`;
+    }
+
+    // Cuộn đến phần nhập kho để người dùng dễ dàng nhìn thấy
+    inventoryInSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function addOrUpdateProduct(e) {
+    e.preventDefault();
+
+    const productId = productIdInput ? productIdInput.value : '';
+    const productName = productNameInput ? productNameInput.value.trim() : '';
+    const productPrice = productPriceInput ? parseFloat(productPriceInput.value) : 0;
+    const productUnit = productUnitInput ? productUnitInput.value.trim() : '';
+    const productMinStock = productMinStockInput ? parseInt(productMinStockInput.value) : 0;
+
+    if (!productName || isNaN(productPrice) || productPrice < 0 || !productUnit || isNaN(productMinStock) || productMinStock < 0) {
+        displayStatusMessage(productStatusMessage, 'Vui lòng điền đầy đủ và chính xác các thông tin sản phẩm.', 'error');
+        return;
+    }
+
+    try {
+        const productData = {
+            name: productName,
+            price: productPrice,
+            unit: productUnit,
+            minStock: productMinStock,
+            stock: 0 // Mặc định tồn kho là 0 khi thêm mới
+        };
+
+        if (productId) {
+            // Cập nhật sản phẩm hiện có
+            const productRef = doc(db, 'products', productId);
+            await updateDoc(productRef, productData);
+            displayStatusMessage(productStatusMessage, 'Cập nhật sản phẩm thành công!', 'success');
+        } else {
+            // Thêm sản phẩm mới
+            await addDoc(collection(db, 'products'), productData);
+            displayStatusMessage(productStatusMessage, 'Thêm sản phẩm thành công!', 'success');
+        }
+
+        // Tải lại danh sách sản phẩm và đóng modal
+        await loadProducts(currentProductsPage);
+        if (productModal) productModal.classList.add('hidden');
+    } catch (error) {
+        console.error("Lỗi khi lưu sản phẩm:", error);
+        displayStatusMessage(productStatusMessage, `Lỗi khi lưu sản phẩm: ${error.message}`, 'error');
+    }
+}
+
+async function editProduct(productId) {
+    if (!productModal || !modalTitle || !addProductForm || !productIdInput || !productNameInput || !productPriceInput || !productUnitInput || !productMinStockInput || !saveProductButton) return;
+
+    modalTitle.textContent = 'Sửa Sản phẩm';
+    saveProductButton.textContent = 'Cập nhật Sản phẩm';
+    productModal.classList.remove('hidden');
+    addProductForm.reset(); // Đặt lại form
+
+    try {
+        const productRef = doc(db, 'products', productId);
+        const productSnap = await getDoc(productRef);
+
+        if (productSnap.exists()) {
+            const product = productSnap.data();
+            productIdInput.value = productId;
+            productNameInput.value = product.name || '';
+            productPriceInput.value = product.price || 0;
+            productUnitInput.value = product.unit || '';
+            productMinStockInput.value = product.minStock || 0;
+        } else {
+            displayStatusMessage(productStatusMessage, 'Không tìm thấy sản phẩm để sửa.', 'error');
+            if (productModal) productModal.classList.add('hidden');
+        }
+    } catch (error) {
+        console.error("Lỗi khi lấy thông tin sản phẩm để sửa:", error);
+        displayStatusMessage(productStatusMessage, `Lỗi: ${error.message}`, 'error');
+        if (productModal) productModal.classList.add('hidden');
+    }
+}
+
+async function deleteProduct(productId) {
+    if (confirm('Bạn có chắc chắn muốn xóa sản phẩm này?')) {
+        try {
+            await deleteDoc(doc(db, 'products', productId));
+            displayStatusMessage(productStatusMessage, 'Xóa sản phẩm thành công!', 'success');
+            await loadProducts(currentProductsPage); // Tải lại danh sách sản phẩm
+        } catch (error) {
+            console.error("Lỗi khi xóa sản phẩm:", error);
+            displayStatusMessage(productStatusMessage, `Lỗi khi xóa sản phẩm: ${error.message}`, 'error');
+        }
+    }
+}
+
+// --- Inventory In Logic ---
+
+async function loadProductsForInventoryIn() {
+    if (!inventoryInProductSelect) return;
+    inventoryInProductSelect.innerHTML = '<option value="">-- Đang tải sản phẩm --</option>';
+    try {
+        const productsCol = collection(db, 'products');
+        const q = query(productsCol, orderBy('name'));
+        const querySnapshot = await getDocs(q);
+        inventoryInProductSelect.innerHTML = '<option value="">-- Chọn sản phẩm --</option>'; // Reset
+        querySnapshot.forEach(doc => {
+            const product = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = product.name;
+            inventoryInProductSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error("Lỗi khi tải sản phẩm cho nhập kho:", error);
+        displayStatusMessage(inventoryInStatusMessage, 'Lỗi khi tải danh sách sản phẩm.', 'error');
+    }
+}
+
+async function saveInventoryIn() {
+    if (!inventoryInProductSelect || !inventoryInQuantityInput || !inventoryInCostInput || !inventoryDateInput || !saveInventoryInButton) return;
+    const productId = inventoryInProductSelect.value;
+    const quantity = parseInt(inventoryInQuantityInput.value);
+    const cost = parseFloat(inventoryInCostInput.value);
+    const date = inventoryDateInput.value; // Dạng YYYY-MM-DD
+
+    if (!productId || isNaN(quantity) || quantity <= 0 || isNaN(cost) || cost < 0 || !date) {
+        displayStatusMessage(inventoryInStatusMessage, 'Vui lòng điền đầy đủ và chính xác thông tin nhập kho.', 'error');
+        return;
+    }
+
+    try {
+        // Lấy thông tin sản phẩm để cập nhật tồn kho
+        const productRef = doc(db, 'products', productId);
+        const productSnap = await getDoc(productRef);
+        if (!productSnap.exists()) {
+            displayStatusMessage(inventoryInStatusMessage, 'Sản phẩm không tồn tại.', 'error');
+            return;
+        }
+        const currentStock = productSnap.data().stock || 0;
+        const newStock = currentStock + quantity;
+
+        // Cập nhật tồn kho sản phẩm
+        await updateDoc(productRef, { stock: newStock });
+
+        // Ghi lịch sử nhập kho
+        await addDoc(collection(db, 'inventoryHistory'), {
+            productId: productId,
+            productName: productSnap.data().name,
+            quantity: quantity,
+            cost: cost,
+            totalCost: quantity * cost,
+            timestamp: Timestamp.fromDate(new Date(date)) // Lưu dưới dạng Timestamp
+        });
+
+        displayStatusMessage(inventoryInStatusMessage, 'Nhập kho thành công!', 'success');
+        // Reset form
+        inventoryInProductSelect.value = '';
+        inventoryInQuantityInput.value = '1';
+        inventoryInCostInput.value = '';
+
+        // Cập nhật lại dashboard (nếu cần)
+        await loadDashboardKPIs();
+        // Cập nhật lại lịch sử nhập kho (nếu đang ở trang đó)
+        if (!inventoryHistorySection.classList.contains('hidden')) {
+            await loadInventoryInHistory();
+        }
+
+    } catch (error) {
+        console.error("Lỗi khi lưu nhập kho:", error);
+        displayStatusMessage(inventoryInStatusMessage, `Lỗi khi lưu nhập kho: ${error.message}`, 'error');
+    }
+}
+
+// --- Inventory History Logic ---
+
+async function loadInventoryInHistory(page = 1) {
+    currentInventoryHistoryPage = page;
+    if (!inventoryHistoryTableBody) return;
+    inventoryHistoryTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Đang tải lịch sử nhập kho...</td></tr>';
+
+    try {
+        const historyCol = collection(db, 'inventoryHistory');
+        const q = query(historyCol, orderBy('timestamp', 'desc')); // Sắp xếp theo thời gian mới nhất
+
+        const querySnapshot = await getDocs(q);
+        let historyEntries = [];
+        querySnapshot.forEach(doc => {
+            const entry = doc.data();
+            historyEntries.push({ id: doc.id, ...entry });
+        });
+
+        const totalEntries = historyEntries.length;
+        const totalPages = Math.ceil(totalEntries / inventoryHistoryPerPage);
+        if (totalPagesInventoryHistorySpan) totalPagesInventoryHistorySpan.textContent = totalPages > 0 ? totalPages : 1;
+        if (currentInventoryHistoryPageSpan) currentInventoryHistoryPageSpan.textContent = currentInventoryHistoryPage;
+
+        const startIndex = (currentInventoryHistoryPage - 1) * inventoryHistoryPerPage;
+        const endIndex = startIndex + inventoryHistoryPerPage;
+        const paginatedEntries = historyEntries.slice(startIndex, endIndex);
+
+        inventoryHistoryTableBody.innerHTML = '';
+        if (paginatedEntries.length === 0) {
+            inventoryHistoryTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Không có lịch sử nhập kho.</td></tr>';
+            return;
+        }
+
+        paginatedEntries.forEach(entry => {
+            const row = inventoryHistoryTableBody.insertRow();
+            const date = entry.timestamp ? new Date(entry.timestamp.seconds * 1000).toLocaleDateString('vi-VN') : 'N/A';
+            row.innerHTML = `
+                <td>${date}</td>
+                <td>${entry.productName || 'N/A'}</td>
+                <td>${entry.quantity || 0}</td>
+                <td>${entry.cost ? entry.cost.toLocaleString('vi-VN') : '0'} VNĐ</td>
+                <td>${entry.totalCost ? entry.totalCost.toLocaleString('vi-VN') : '0'} VNĐ</td>
+            `;
+        });
+
+        if (prevInventoryHistoryPageButton) prevInventoryHistoryPageButton.disabled = currentInventoryHistoryPage === 1;
+        if (nextInventoryHistoryPageButton) nextInventoryHistoryPageButton.disabled = currentInventoryHistoryPage === totalPages;
+
+    } catch (error) {
+        console.error("Lỗi khi tải lịch sử nhập kho:", error);
+        inventoryHistoryTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red;">Lỗi khi tải lịch sử nhập kho.</td></tr>';
+    }
+}
+
+// --- Consume Logic ---
+
+async function loadConsumableProducts() {
+    if (!consumableProductsTableBody) return;
+    consumableProductsTableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Đang tải sản phẩm tiêu hao...</td></tr>';
+    try {
+        const productsCol = collection(db, 'products');
+        const q = query(productsCol, where('stock', '>', 0), orderBy('stock', 'desc'));
+        const querySnapshot = await getDocs(q);
+        consumableProductsTableBody.innerHTML = '';
+        if (querySnapshot.empty) {
+            consumableProductsTableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Không có sản phẩm nào để tiêu hao.</td></tr>';
+            return;
+        }
+        querySnapshot.forEach(doc => {
+            const product = doc.data();
+            const row = consumableProductsTableBody.insertRow();
+            row.setAttribute('data-id', doc.id);
+            row.innerHTML = `
+                <td>${product.name}</td>
+                <td>${product.price.toLocaleString('vi-VN')} VNĐ</td>
+                <td>${product.stock || 0} ${product.unit || ''}</td>
+                <td>
+                    <input type="number" class="consume-quantity-input" data-product-id="${doc.id}" max="${product.stock || 0}" min="0" value="0">
+                </td>
+            `;
+        });
+    } catch (error) {
+        console.error("Lỗi khi tải sản phẩm tiêu hao:", error);
+        displayStatusMessage(consumeStatusMessage, 'Lỗi khi tải danh sách sản phẩm tiêu hao.', 'error');
+    }
+}
+
+async function saveConsumption() {
+    if (!saveConsumptionButton) return; // Kiểm tra nút có tồn tại
+
+    const confirmSave = confirm('Bạn có chắc chắn muốn lưu các mục tiêu hao này?');
+    if (!confirmSave) return;
+
+    const quantityInputs = document.querySelectorAll('.consume-quantity-input');
+    const updates = [];
+    const today = new Date().toISOString().slice(0, 10); // Lấy ngày hiện tại YYYY-MM-DD
+
+    try {
+        for (const input of quantityInputs) {
+            const productId = input ? input.dataset.productId : null;
+            const quantityConsumed = (input && input.value !== undefined && input.value !== null) ? parseInt(input.value) : 0; // Đã sửa lỗi ở đây
+
+            if (quantityConsumed > 0 && productId) {
+                updates.push({ productId, quantityConsumed, inputElement: input });
+            } else {
+                console.warn('Bỏ qua phần tử input không hợp lệ:', input);
+            }
+        }
+
+        if (updates.length === 0) {
+            displayStatusMessage(consumeStatusMessage, 'Không có mục tiêu hao nào để lưu.', 'warning');
+            return;
+        }
+
+        for (const item of updates) {
+            const { productId, quantityConsumed, inputElement } = item;
+            const productRef = doc(db, 'products', productId);
+            const productSnap = await getDoc(productRef);
+
+            if (productSnap.exists()) {
+                const product = productSnap.data();
+                const currentStock = product.stock || 0;
+                if (quantityConsumed > currentStock) {
+                    displayStatusMessage(consumeStatusMessage, `Lỗi: Số lượng tiêu hao cho ${product.name} vượt quá tồn kho hiện tại (${currentStock}).`, 'error');
+                    // Không rollback các mục khác, chỉ hiển thị lỗi cho mục này
+                    // Bạn có thể cần một chiến lược xử lý lỗi phức tạp hơn nếu muốn giao dịch nguyên tử
+                    continue; // Bỏ qua mục này và tiếp tục với các mục khác
+                }
+
+                const newStock = currentStock - quantityConsumed;
+                const costPerUnit = product.cost || 0; // Giả sử sản phẩm có thuộc tính giá vốn (cost)
+                const salePricePerUnit = product.price || 0; // Giá bán
+                const totalCostOfConsumption = quantityConsumed * costPerUnit;
+                const totalRevenueFromConsumption = quantityConsumed * salePricePerUnit;
+                const profit = totalRevenueFromConsumption - totalCostOfConsumption;
+
+                // Cập nhật tồn kho
+                await updateDoc(productRef, { stock: newStock });
+
+                // Ghi lịch sử tiêu hao (bán hàng)
+                await addDoc(collection(db, 'consumptionHistory'), {
+                    productId: productId,
+                    productName: product.name,
+                    quantity: quantityConsumed,
+                    costPerUnit: costPerUnit, // Giá vốn mỗi đơn vị
+                    salePricePerUnit: salePricePerUnit, // Giá bán mỗi đơn vị
+                    totalCost: totalCostOfConsumption,
+                    totalRevenue: totalRevenueFromConsumption,
+                    profit: profit,
+                    timestamp: Timestamp.fromDate(new Date(today)) // Ghi ngày tiêu hao
+                });
+
+                // Đặt lại giá trị input về 0 sau khi lưu thành công
+                if (inputElement) {
+                    inputElement.value = "0";
+                }
+
+            } else {
+                console.warn(`Sản phẩm với ID ${productId} không tồn tại.`);
+            }
+        }
+        displayStatusMessage(consumeStatusMessage, 'Tiêu hao đã được lưu thành công và tồn kho đã được cập nhật!', 'success');
+
+        // Tải lại các KPI và lịch sử tiêu hao sau khi lưu thành công
+        await loadDashboardKPIs();
+        await loadConsumptionHistory();
+
+    } catch (error) {
+        console.error("Lỗi khi lưu tiêu hao:", error);
+        displayStatusMessage(consumeStatusMessage, `Lỗi khi lưu tiêu hao: ${error.message}`, 'error');
+    }
+}
+
+async function loadConsumptionHistory(page = 1) {
+    currentConsumptionHistoryPage = page;
+    if (!consumptionHistoryTableBody) return;
+    consumptionHistoryTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Đang tải lịch sử tiêu hao...</td></tr>';
+
+    try {
+        const historyCol = collection(db, 'consumptionHistory');
+        const q = query(historyCol, orderBy('timestamp', 'desc'));
+
+        const querySnapshot = await getDocs(q);
+        let historyEntries = [];
+        querySnapshot.forEach(doc => {
+            const entry = doc.data();
+            historyEntries.push({ id: doc.id, ...entry });
+        });
+
+        const totalEntries = historyEntries.length;
+        const totalPages = Math.ceil(totalEntries / consumptionHistoryPerPage);
+        if (totalPagesConsumptionHistorySpan) totalPagesConsumptionHistorySpan.textContent = totalPages > 0 ? totalPages : 1;
+        if (currentConsumptionHistoryPageSpan) currentConsumptionHistoryPageSpan.textContent = currentConsumptionHistoryPage;
+
+        const startIndex = (currentConsumptionHistoryPage - 1) * consumptionHistoryPerPage;
+        const endIndex = startIndex + consumptionHistoryPerPage;
+        const paginatedEntries = historyEntries.slice(startIndex, endIndex);
+
+        consumptionHistoryTableBody.innerHTML = '';
+        if (paginatedEntries.length === 0) {
+            consumptionHistoryTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Không có lịch sử tiêu hao.</td></tr>';
+            return;
+        }
+
+        paginatedEntries.forEach(entry => {
+            const row = consumptionHistoryTableBody.insertRow();
+            const date = entry.timestamp ? new Date(entry.timestamp.seconds * 1000).toLocaleDateString('vi-VN') : 'N/A';
+            row.innerHTML = `
+                <td>${date}</td>
+                <td>${entry.productName || 'N/A'}</td>
+                <td>${entry.quantity || 0}</td>
+                <td>${entry.totalCost ? entry.totalCost.toLocaleString('vi-VN') : '0'} VNĐ</td>
+                <td>${entry.totalRevenue ? entry.totalRevenue.toLocaleString('vi-VN') : '0'} VNĐ</td>
+            `;
+        });
+
+        if (prevConsumptionHistoryPageButton) prevConsumptionHistoryPageButton.disabled = currentConsumptionHistoryPage === 1;
+        if (nextConsumptionHistoryPageButton) nextConsumptionHistoryPageButton.disabled = currentConsumptionHistoryPage === totalPages;
+
+    } catch (error) {
+        console.error("Lỗi khi tải lịch sử tiêu hao:", error);
+        consumptionHistoryTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red;">Lỗi khi tải lịch sử tiêu hao.</td></tr>';
+    }
+}
+
+// --- Reports Logic ---
+
+// Hàm này sẽ được gọi khi thay đổi loại báo cáo
+function setupReportFilters() {
+    if (!reportPeriodSelect || !customDateRangeDiv || !reportStartDateInput || !reportEndDateInput) {
+        console.error("Không tìm thấy các phần tử DOM để thiết lập bộ lọc báo cáo.");
+        return;
+    }
+
+    // Thiết lập trạng thái ban đầu dựa trên giá trị mặc định của select
+    const initialReportType = reportPeriodSelect.value;
+    updateReportFilterVisibility(initialReportType);
+
+    reportPeriodSelect.addEventListener('change', () => {
+        const selectedType = reportPeriodSelect.value;
+        updateReportFilterVisibility(selectedType);
+    });
+}
+
+function updateReportFilterVisibility(selectedType) {
+    if (customDateRangeDiv) {
+        if (selectedType === 'custom') {
+            customDateRangeDiv.classList.remove('hidden');
+        } else {
+            customDateRangeDiv.classList.add('hidden');
+        }
+    }
+}
+
+async function generateRevenueReport(reportPeriod, dates = {}) {
+    if (!profitReportContent) return;
+    profitReportContent.innerHTML = '<p style="text-align:center;">Đang tạo báo cáo...</p>';
+
+    let startDate, endDate;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Đặt về đầu ngày
+
+    try {
+        switch (reportPeriod) {
+            case 'today':
+                startDate = Timestamp.fromDate(today);
+                endDate = Timestamp.fromDate(new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1)); // Cuối ngày
+                break;
+            case 'last7days':
+                startDate = Timestamp.fromDate(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000));
+                endDate = Timestamp.fromDate(new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1));
+                break;
+            case 'thisMonth':
+                startDate = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), 1));
+                endDate = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999)); // Cuối tháng
+                break;
+            case 'lastMonth':
+                startDate = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+                endDate = Timestamp.fromDate(new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999));
+                break;
+            case 'thisYear':
+                startDate = Timestamp.fromDate(new Date(today.getFullYear(), 0, 1));
+                endDate = Timestamp.fromDate(new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999));
+                break;
+            case 'custom':
+                if (dates.startDate && dates.endDate) {
+                    startDate = Timestamp.fromDate(new Date(dates.startDate));
+                    endDate = Timestamp.fromDate(new Date(new Date(dates.endDate).getTime() + 24 * 60 * 60 * 1000 - 1)); // Cuối ngày kết thúc
+                } else {
+                    displayStatusMessage(reportsSection, 'Vui lòng chọn đầy đủ ngày bắt đầu và ngày kết thúc cho báo cáo tùy chỉnh.', 'error');
+                    profitReportContent.innerHTML = '';
+                    return;
+                }
+                break;
+            default:
+                displayStatusMessage(reportsSection, 'Loại báo cáo không hợp lệ.', 'error');
+                profitReportContent.innerHTML = '';
+                return;
+        }
+
+        // Truy vấn dữ liệu tiêu hao (doanh thu)
+        const consumptionCol = collection(db, 'consumptionHistory');
+        const q = query(
+            consumptionCol,
+            where('timestamp', '>=', startDate),
+            where('timestamp', '<=', endDate),
+            orderBy('timestamp', 'asc')
+        );
+        const querySnapshot = await getDocs(q);
+
+        let totalRevenue = 0;
+        let totalCost = 0;
+        let totalProfit = 0;
+        const dailyData = {}; // Để tổng hợp theo ngày cho biểu đồ
+
+        querySnapshot.forEach(doc => {
+            const entry = doc.data();
+            totalRevenue += entry.totalRevenue || 0;
+            totalCost += entry.totalCost || 0;
+            totalProfit += entry.profit || 0;
+
+            // Thu thập dữ liệu theo ngày cho biểu đồ
+            const dateKey = entry.timestamp.toDate().toISOString().slice(0, 10);
+            if (!dailyData[dateKey]) {
+                dailyData[dateKey] = { revenue: 0, profit: 0 };
+            }
+            dailyData[dateKey].revenue += entry.totalRevenue || 0;
+            dailyData[dateKey].profit += entry.profit || 0;
+        });
+
+        // Tạo dữ liệu cho biểu đồ
+        const chartLabels = Object.keys(dailyData).sort();
+        const chartRevenueData = chartLabels.map(date => dailyData[date].revenue);
+        const chartProfitData = chartLabels.map(date => dailyData[date].profit);
+
+        profitReportContent.innerHTML = `
+            <h3>Báo cáo Doanh thu & Lợi nhuận ${reportPeriod === 'custom' ? `từ ${new Date(dates.startDate).toLocaleDateString('vi-VN')} đến ${new Date(dates.endDate).toLocaleDateString('vi-VN')}` : ''}</h3>
+            <p><strong>Tổng Doanh thu:</strong> ${totalRevenue.toLocaleString('vi-VN')} VNĐ</p>
+            <p><strong>Tổng Giá vốn hàng bán:</strong> ${totalCost.toLocaleString('vi-VN')} VNĐ</p>
+            <p><strong>Tổng Lợi nhuận:</strong> ${totalProfit.toLocaleString('vi-VN')} VNĐ</p>
+            <div class="chart-container" style="margin-top: 20px;">
+                <canvas id="revenueProfitChart"></canvas>
+            </div>
+        `;
+
+        updateRevenueProfitChart(chartLabels, chartRevenueData, chartProfitData);
+
+    } catch (error) {
+        console.error("Lỗi khi tạo báo cáo doanh thu:", error);
+        displayStatusMessage(reportsSection, `Lỗi khi tạo báo cáo: ${error.message}`, 'error');
+        profitReportContent.innerHTML = '';
+    }
+}
+
+let revenueProfitChartInstance;
+function updateRevenueProfitChart(labels, revenueData, profitData) {
+    const ctx = document.getElementById('revenueProfitChart');
+    if (!ctx) return;
+
+    if (revenueProfitChartInstance) {
+        revenueProfitChartInstance.destroy();
+    }
+
+    revenueProfitChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Doanh thu',
+                    data: revenueData,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    fill: true,
+                    tension: 0.3
+                },
+                {
+                    label: 'Lợi nhuận',
+                    data: profitData,
+                    borderColor: 'rgba(153, 102, 255, 1)',
+                    backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                    fill: true,
+                    tension: 0.3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Số tiền (VNĐ)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Ngày'
+                    }
+                }
+            }
+        }
+    });
+}
+
+
+// --- Event Listeners ---
+
+// Sidebar Toggle
+if (sidebarToggle && sidebar && mainContentArea) {
+    sidebarToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('hidden');
+        // Trên màn hình nhỏ, mainContentArea không cần toggle 'expanded' vì sidebar là fixed
+        // mainContentArea.classList.toggle('expanded'); // Bỏ dòng này
+    });
+}
+
+// Thêm sự kiện click cho mainContentArea để đóng sidebar khi click ra ngoài (trên mobile)
+if (mainContentArea && sidebar) {
+    mainContentArea.addEventListener('click', () => {
+        // Chỉ đóng sidebar nếu nó đang mở và màn hình là nhỏ (dưới 768px)
+        if (!sidebar.classList.contains('hidden') && window.innerWidth <= 768) {
+            sidebar.classList.add('hidden');
+        }
+    });
+}
+// Thêm sự kiện click cho các liên kết điều hướng để đóng sidebar sau khi chọn (trên mobile)
+document.querySelectorAll('.main-nav ul li').forEach(item => {
+    item.addEventListener('click', () => {
+        if (window.innerWidth <= 768 && !sidebar.classList.contains('hidden')) {
+            sidebar.classList.add('hidden');
+        }
+    });
 });
 
-// --- Logic khởi tạo Dashboard ---
-// Hàm này sẽ được gọi sau khi DOM đã tải và auth.js đã xử lý đăng nhập.
-async function initializeDashboard() {
-    // Lấy thông tin người dùng hiện tại từ Firebase Auth
-    const user = auth.currentUser;
-    if (user && userName) {
-        // Hiển thị tên người dùng (phần trước @ của email)
-        userName.textContent = user.email.split('@')[0];
-    } else if (userName) {
-        userName.textContent = user.email.split('@')[0]; // Hoặc ẩn đi nếu không có người dùng
-    }
-
-    // Tải tất cả dữ liệu cần thiết cho dashboard
-    await loadDashboardSummary();
-    await loadProducts();
-    await loadProductsForInventoryIn();
-    await loadInventoryInHistory();
-    await loadConsumableProducts();
-    setupReportFilters(); // Thiết lập bộ lọc báo cáo
-    showSection(dashboardSection, 'Tổng quan'); // Hiển thị phần tổng quan mặc định
-}
-
-// --- Xử lý Đăng xuất ---
-if (logoutButton) {
-    logoutButton.addEventListener('click', async () => {
-        try {
-            await signOut(auth);
-            console.log('User signed out successfully.');
-            window.location.href = 'login.html'; // Chuyển hướng đến trang đăng nhập
-        } catch (error) {
-            console.error("Lỗi đăng xuất:", error);
-            alert('Không thể đăng xuất. Vui lòng thử lại.'); // Sử dụng alert tạm thời, nên thay bằng modal
-        }
-    });
-}
-
-// --- Xử lý Điều hướng Sidebar ---
+// Navigation
 if (navDashboard) {
     navDashboard.addEventListener('click', async (e) => {
         e.preventDefault();
-        showSection(dashboardSection, 'Tổng quan');
-        await loadDashboardSummary(); // Tải lại dữ liệu tóm tắt
+        showSection(dashboardSection, 'Tổng quan Kho hàng'); // Đã thay đổi tiêu đề
+        await loadDashboardKPIs();
     });
 }
 
@@ -297,19 +974,69 @@ if (navProducts) {
     navProducts.addEventListener('click', async (e) => {
         e.preventDefault();
         showSection(productsSection, 'Quản lý Sản phẩm');
-        await loadProducts(); // Tải lại danh sách sản phẩm
-        closeProductModal();
+        await loadProducts();
     });
 }
+
+if (addProductButton) {
+    addProductButton.addEventListener('click', () => {
+        if (!productModal || !modalTitle || !addProductForm || !productIdInput || !saveProductButton || !productStatusMessage) return;
+        modalTitle.textContent = 'Thêm Sản phẩm';
+        saveProductButton.textContent = 'Thêm sản phẩm';
+        productIdInput.value = ''; // Xóa ID sản phẩm khi thêm mới
+        addProductForm.reset();
+        productStatusMessage.textContent = ''; // Xóa thông báo trạng thái
+        productModal.classList.remove('hidden');
+    });
+}
+
+if (closeButton) {
+    closeButton.addEventListener('click', () => {
+        if (productModal) productModal.classList.add('hidden');
+    });
+}
+
+// Đóng modal khi click ra ngoài
+if (productModal) {
+    productModal.addEventListener('click', (e) => {
+        if (e.target === productModal) {
+            productModal.classList.add('hidden');
+        }
+    });
+}
+
+if (addProductForm) {
+    addProductForm.addEventListener('submit', addOrUpdateProduct);
+}
+
+if (productSearchInput) {
+    productSearchInput.addEventListener('input', () => {
+        // Debounce search input if needed for performance
+        loadProducts(1, productSearchInput.value);
+    });
+}
+
+if (prevProductsPageButton) {
+    prevProductsPageButton.addEventListener('click', () => {
+        if (currentProductsPage > 1) {
+            loadProducts(currentProductsPage - 1, productSearchInput ? productSearchInput.value : '');
+        }
+    });
+}
+
+if (nextProductsPageButton) {
+    nextProductsPageButton.addEventListener('click', () => {
+        loadProducts(currentProductsPage + 1, productSearchInput ? productSearchInput.value : '');
+    });
+}
+
 
 if (navInventoryIn) {
     navInventoryIn.addEventListener('click', async (e) => {
         e.preventDefault();
         showSection(inventoryInSection, 'Nhập kho');
-        await loadProductsForInventoryIn(); // Tải lại danh sách sản phẩm cho nhập kho
-        if (addInventoryInForm) addInventoryInForm.reset(); // Reset form
-        if (inventoryStatusMessage) inventoryStatusMessage.textContent = ''; // Xóa thông báo
-        // Đặt ngày nhập kho mặc định là hôm nay
+        await loadProductsForInventoryIn();
+        // Đặt ngày nhập kho mặc định là ngày hiện tại
         if (inventoryDateInput) {
             const today = new Date();
             const year = today.getFullYear();
@@ -320,19 +1047,57 @@ if (navInventoryIn) {
     });
 }
 
+if (saveInventoryInButton) {
+    saveInventoryInButton.addEventListener('click', saveInventoryIn);
+}
+
 if (navInventoryHistory) {
     navInventoryHistory.addEventListener('click', async (e) => {
         e.preventDefault();
         showSection(inventoryHistorySection, 'Lịch sử Nhập kho');
-        await loadInventoryInHistory(); // Tải lại lịch sử nhập kho
+        await loadInventoryInHistory();
     });
 }
+
+if (prevInventoryHistoryPageButton) {
+    prevInventoryHistoryPageButton.addEventListener('click', () => {
+        if (currentInventoryHistoryPage > 1) {
+            loadInventoryInHistory(currentInventoryHistoryPage - 1);
+        }
+    });
+}
+
+if (nextInventoryHistoryPageButton) {
+    nextInventoryHistoryPageButton.addEventListener('click', () => {
+        loadInventoryInHistory(currentInventoryHistoryPage + 1);
+    });
+}
+
 
 if (navConsume) {
     navConsume.addEventListener('click', async (e) => {
         e.preventDefault();
         showSection(consumeSection, 'Tiêu hao Hàng hóa');
-        await loadConsumableProducts(); // Tải lại danh sách sản phẩm tiêu hao
+        await loadConsumableProducts();
+        await loadConsumptionHistory(); // Tải lịch sử tiêu hao khi chuyển đến trang này
+    });
+}
+
+if (saveConsumptionButton) {
+    saveConsumptionButton.addEventListener('click', saveConsumption);
+}
+
+if (prevConsumptionHistoryPageButton) {
+    prevConsumptionHistoryPageButton.addEventListener('click', () => {
+        if (currentConsumptionHistoryPage > 1) {
+            loadConsumptionHistory(currentConsumptionHistoryPage - 1);
+        }
+    });
+}
+
+if (nextConsumptionHistoryPageButton) {
+    nextConsumptionHistoryPageButton.addEventListener('click', () => {
+        loadConsumptionHistory(currentConsumptionHistoryPage + 1);
     });
 }
 
@@ -340,934 +1105,66 @@ if (navReports) {
     navReports.addEventListener('click', async (e) => {
         e.preventDefault();
         showSection(reportsSection, 'Báo cáo Doanh thu & Lợi nhuận');
-        setupReportFilters(); // Thiết lập lại bộ lọc báo cáo
-        if (reportContent) reportContent.innerHTML = '<p style="text-align:center; color:#666;">Chọn loại báo cáo và khoảng thời gian để tạo báo cáo.</p>';
-        if (profitReportContent) profitReportContent.innerHTML = '<p style="text-align:center; color:#666;">Chọn loại báo cáo và khoảng thời gian để tạo báo cáo.</p>';
+        setupReportFilters(); // Thiết lập bộ lọc hiển thị
+        if (profitReportContent) profitReportContent.innerHTML = '<p style="text-align:center; color:#666;">Chọn khoảng thời gian và nhấp "Tạo Báo cáo".</p>';
     });
-}
-
-// --- Hàm Tóm tắt Dashboard ---
-async function loadDashboardSummary() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Đặt về đầu ngày
-
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    firstDayOfMonth.setHours(0, 0, 0, 0);
-
-    let totalDailyRevenue = 0;
-    let totalMonthlyRevenue = 0;
-    let lowStockCount = 0;
-
-    try {
-        const transactionsCol = collection(db, 'daily_transactions');
-        // Lấy tất cả giao dịch, sau đó lọc trong JS cho tính linh hoạt
-        // Hoặc bạn có thể thêm các truy vấn where cho ngày/tháng cụ thể nếu cần tối ưu hơn
-        const transactionsSnap = await getDocs(transactionsCol);
-
-        transactionsSnap.forEach(doc => {
-            const data = doc.data();
-            let transactionDate;
-            if (data.date instanceof Timestamp) {
-                transactionDate = data.date.toDate();
-            } else if (typeof data.date === 'string') {
-                // Đảm bảo parse đúng múi giờ để so sánh ngày
-                const dateParts = data.date.split('-'); // Format YYYY-MM-DD
-                transactionDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
-            } else {
-                console.warn('Invalid date format for transaction:', data.date);
-                return;
-            }
-            transactionDate.setHours(0, 0, 0, 0); // Đặt về đầu ngày để so sánh chính xác
-
-            if (transactionDate.toDateString() === today.toDateString()) {
-                totalDailyRevenue += data.revenue || 0;
-            }
-
-            if (transactionDate >= firstDayOfMonth &&
-                transactionDate.getFullYear() === today.getFullYear() &&
-                transactionDate.getMonth() === today.getMonth()) {
-                totalMonthlyRevenue += data.revenue || 0;
-            }
-        });
-
-        const productsCol = collection(db, 'products');
-        const productSnapshot = await getDocs(productsCol);
-        productSnapshot.forEach(doc => {
-            const product = doc.data();
-            if (product.currentStock !== undefined && product.minStock !== undefined && product.currentStock <= product.minStock) {
-                lowStockCount++;
-            }
-        });
-
-        if (dailyRevenueElem) dailyRevenueElem.textContent = `${totalDailyRevenue.toLocaleString('vi-VN')} VNĐ`;
-        if (monthlyRevenueElem) monthlyRevenueElem.textContent = `${totalMonthlyRevenue.toLocaleString('vi-VN')} VNĐ`;
-        if (lowStockCountElem) lowStockCountElem.textContent = lowStockCount;
-
-        updateRevenueChart(transactionsSnap.docs.map(doc => doc.data()));
-
-    } catch (error) {
-        console.error("Lỗi khi tải tóm tắt dashboard:", error);
-        // Hiển thị thông báo lỗi cụ thể cho người dùng
-        if (dailyRevenueElem) dailyRevenueElem.textContent = 'Lỗi!';
-        if (monthlyRevenueElem) monthlyRevenueElem.textContent = 'Lỗi!';
-        if (lowStockCountElem) lowStockCountElem.textContent = 'Lỗi!';
-        displayStatusMessage(document.querySelector('.dashboard-summary'), `Lỗi khi tải dữ liệu tổng quan: ${error.message}`, 'error'); // Hiển thị ở một vị trí phù hợp
-    }
-}
-
-// Chart.js cho Dashboard
-function updateRevenueChart(transactions) {
-    if (!revenueChartCanvas) return; // Đảm bảo canvas tồn tại
-
-    if (revenueChart) {
-        revenueChart.destroy();
-    }
-
-    const dailyRevenueMap = new Map();
-    transactions.forEach(data => {
-        let transactionDate;
-        if (data.date instanceof Timestamp) {
-            transactionDate = data.date.toDate();
-        } else if (typeof data.date === 'string') {
-             const dateParts = data.date.split('-'); // Format YYYY-MM-DD
-             transactionDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
-        } else {
-            return;
-        }
-        const dateString = transactionDate.toISOString().slice(0, 10);
-        dailyRevenueMap.set(dateString, (dailyRevenueMap.get(dateString) || 0) + (data.revenue || 0));
-    });
-
-    const labels = [];
-    const data = [];
-    for (let i = 6; i >= 0; i--) { // Lấy dữ liệu 7 ngày gần nhất
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const dateString = d.toISOString().slice(0, 10);
-        labels.push(d.toLocaleDateString('vi-VN', { month: 'numeric', day: 'numeric' }));
-        data.push(dailyRevenueMap.get(dateString) || 0);
-    }
-
-    const ctx = revenueChartCanvas.getContext('2d');
-    revenueChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Doanh thu (VNĐ)',
-                data: data,
-                borderColor: 'rgb(75, 192, 192)',
-                tension: 0.1,
-                fill: false,
-                borderWidth: 2,
-                pointBackgroundColor: 'rgb(75, 192, 192)',
-                pointBorderColor: '#fff',
-                pointHoverBackgroundColor: '#fff',
-                pointHoverBorderColor: 'rgb(75, 192, 192)'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Doanh thu (VNĐ)'
-                    },
-                    ticks: {
-                        callback: function(value, index, ticks) {
-                            return value.toLocaleString('vi-VN');
-                        }
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Ngày'
-                    }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.parsed.y !== null) {
-                                label += context.parsed.y.toLocaleString('vi-VN') + ' VNĐ';
-                            }
-                            return label;
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-// --- Hàm Quản lý Sản phẩm ---
-async function loadProducts() {
-    if (!productsTableBody) return; // Đảm bảo table body tồn tại
-
-    productsTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Đang tải danh sách sản phẩm...</td></tr>';
-    try {
-        const productsCol = collection(db, 'products');
-        const productSnapshot = await getDocs(productsCol);
-
-        productsTableBody.innerHTML = '';
-
-        if (productSnapshot.empty) {
-            productsTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Chưa có sản phẩm nào. Vui lòng thêm sản phẩm mới.</td></tr>';
-            return;
-        }
-
-        productSnapshot.forEach(doc => {
-            const product = doc.data();
-            const row = productsTableBody.insertRow();
-            row.setAttribute('data-id', doc.id);
-
-            const isLowStock = (product.currentStock !== undefined && product.minStock !== undefined && product.currentStock <= product.minStock);
-
-            row.innerHTML = `
-                <td>${product.name || 'N/A'}</td>
-                <td>${(product.price || 0).toLocaleString('vi-VN')} VNĐ</td>
-                <td>${(product.currentStock || 0)} ${product.unit || ''}</td>
-                <td>${(product.minStock || 0)} ${product.unit || ''}</td>
-                <td class="${isLowStock ? 'low-stock-alert' : ''}">
-                    ${isLowStock ? 'Thấp!' : 'Ổn định'}
-                </td>
-                <td class="action-buttons">
-                    <button class="edit-btn btn-edit" data-id="${doc.id}"><i class="fas fa-edit"></i> Sửa</button>
-                    <button class="delete-btn btn-delete" data-id="${doc.id}"><i class="fas fa-trash-alt"></i> Xóa</button>
-                    ${isLowStock ? `<button class="import-btn btn-import" data-id="${doc.id}"><i class="fas fa-truck-loading"></i> Nhập kho</button>` : ''}
-                </td>
-            `;
-        });
-
-        productsTableBody.querySelectorAll('.edit-btn').forEach(button => {
-            button.addEventListener('click', handleEditProduct);
-        });
-        productsTableBody.querySelectorAll('.delete-btn').forEach(button => {
-            button.addEventListener('click', handleDeleteProduct);
-        });
-        productsTableBody.querySelectorAll('.import-btn').forEach(button => {
-            button.addEventListener('click', handleImportProduct);
-        });
-
-    } catch (error) {
-        console.error("Lỗi khi tải sản phẩm:", error);
-        productsTableBody.innerHTML = '<tr><td colspan="6" style="color:red; text-align:center;">Lỗi khi tải sản phẩm. Vui lòng kiểm tra console.</td></tr>';
-        displayStatusMessage(productStatusMessage, `Lỗi khi tải sản phẩm: ${error.message}`, 'error');
-    }
-}
-
-if (addNewProductButton) {
-    addNewProductButton.addEventListener('click', () => {
-        openProductModal(false);
-    });
-}
-
-if (addProductForm) {
-    addProductForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const name = productNameInput.value.trim();
-        const price = parseFloat(productPriceInput.value);
-        const unit = productUnitInput.value.trim();
-        const minStock = parseInt(productMinStockInput.value);
-
-        if (!name || isNaN(price) || price <= 0 || !unit || isNaN(minStock) || minStock < 0) {
-            displayStatusMessage(productStatusMessage, 'Vui lòng nhập đầy đủ và hợp lệ thông tin sản phẩm.', 'error');
-            return;
-        }
-
-        try {
-            if (editingProductId) {
-                const productRef = doc(db, 'products', editingProductId);
-                await updateDoc(productRef, {
-                    name: name,
-                    price: price,
-                    unit: unit,
-                    minStock: minStock
-                });
-                displayStatusMessage(productStatusMessage, 'Cập nhật sản phẩm thành công!', 'success');
-            } else {
-                await addDoc(collection(db, 'products'), {
-                    name: name,
-                    price: price,
-                    unit: unit,
-                    minStock: minStock,
-                    currentStock: 0
-                });
-                displayStatusMessage(productStatusMessage, 'Thêm sản phẩm thành công!', 'success');
-            }
-
-            addProductForm.reset();
-            closeProductModal();
-            loadProducts();
-            loadProductsForInventoryIn();
-            loadConsumableProducts();
-            loadDashboardSummary();
-
-        } catch (error) {
-            console.error("Lỗi khi lưu sản phẩm:", error);
-            displayStatusMessage(productStatusMessage, `Lỗi khi lưu sản phẩm: ${error.message}`, 'error');
-        }
-    });
-}
-
-async function handleEditProduct(e) {
-    const productId = e.currentTarget.dataset.id;
-    openProductModal(true, productId);
-
-    try {
-        const productRef = doc(db, 'products', productId);
-        const productSnap = await getDoc(productRef);
-
-        if (productSnap.exists()) {
-            const product = productSnap.data();
-            if (productNameInput) productNameInput.value = product.name;
-            if (productPriceInput) productPriceInput.value = product.price;
-            if (productUnitInput) productUnitInput.value = product.unit;
-            if (productMinStockInput) productMinStockInput.value = product.minStock;
-        } else {
-            displayStatusMessage(productStatusMessage, 'Không tìm thấy sản phẩm để chỉnh sửa.', 'error');
-            closeProductModal();
-        }
-    } catch (error) {
-        console.error("Lỗi khi lấy thông tin sản phẩm để chỉnh sửa:", error);
-        displayStatusMessage(productStatusMessage, `Lỗi: ${error.message}`, 'error');
-        closeProductModal();
-    }
-}
-
-async function handleDeleteProduct(e) {
-    const productId = e.currentTarget.dataset.id;
-    // Thay thế confirm() bằng modal tùy chỉnh nếu bạn không muốn dùng alert/confirm của trình duyệt
-    if (!confirm('Bạn có chắc chắn muốn xóa sản phẩm này? Thao tác này không thể hoàn tác.')) {
-        return;
-    }
-
-    try {
-        await deleteDoc(doc(db, 'products', productId));
-        displayStatusMessage(productStatusMessage, 'Xóa sản phẩm thành công!', 'success');
-        loadProducts();
-        loadProductsForInventoryIn();
-        loadConsumableProducts();
-        loadDashboardSummary();
-
-    } catch (error) {
-        console.error("Lỗi khi xóa sản phẩm:", error);
-        displayStatusMessage(productStatusMessage, `Lỗi khi xóa sản phẩm: ${error.message}`, 'error');
-    }
-}
-
-async function handleImportProduct(e) {
-    const productId = e.currentTarget.dataset.id;
-
-    showSection(inventoryInSection, 'Nhập kho');
-
-    await loadProductsForInventoryIn();
-
-    if (inventoryProductNameSelect) inventoryProductNameSelect.value = productId;
-
-    if (inventoryDateInput) {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        inventoryDateInput.value = `${year}-${month}-${day}`;
-    }
-
-    if (inventoryProductNameSelect) {
-        inventoryProductNameSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-}
-
-// --- Hàm Nhập kho (Import) ---
-async function loadProductsForInventoryIn() {
-    if (!inventoryProductNameSelect) return; // Đảm bảo select box tồn tại
-
-    inventoryProductNameSelect.innerHTML = '<option value="">-- Chọn sản phẩm --</option>';
-    try {
-        const productsCol = collection(db, 'products');
-        const productSnapshot = await getDocs(productsCol);
-
-        if (productSnapshot.empty) {
-            const option = document.createElement('option');
-            option.value = '';
-            option.textContent = 'Chưa có sản phẩm để nhập kho';
-            inventoryProductNameSelect.appendChild(option);
-            return;
-        }
-
-        productSnapshot.forEach(doc => {
-            const product = doc.data();
-            const option = document.createElement('option');
-            option.value = doc.id;
-            option.textContent = product.name;
-            inventoryProductNameSelect.appendChild(option);
-        });
-    } catch (error) {
-        console.error("Lỗi khi tải sản phẩm cho nhập kho:", error);
-        displayStatusMessage(inventoryStatusMessage, `Lỗi khi tải danh sách sản phẩm: ${error.message}`, 'error');
-    }
-}
-
-if (addInventoryInForm) {
-    addInventoryInForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const productId = inventoryProductNameSelect.value;
-        const quantity = parseInt(inventoryQuantityInput.value);
-        const price = parseFloat(inventoryPriceInput.value);
-        const date = inventoryDateInput.value;
-
-        if (!productId || isNaN(quantity) || quantity <= 0 || isNaN(price) || price <= 0 || !date) {
-            displayStatusMessage(inventoryStatusMessage, 'Vui lòng nhập đầy đủ và hợp lệ thông tin nhập kho.', 'error');
-            return;
-        }
-
-        try {
-            const productRef = doc(db, 'products', productId);
-            const productSnap = await getDoc(productRef);
-
-            if (productSnap.exists()) {
-                const productData = productSnap.data();
-                const currentStock = productData.currentStock || 0;
-                const newStock = currentStock + quantity;
-
-                await updateDoc(productRef, {
-                    currentStock: newStock
-                });
-
-                await addDoc(collection(db, 'inventory_in_history'), {
-                    productId: productId,
-                    productName: productData.name,
-                    quantity: quantity,
-                    price: price,
-                    unit: productData.unit,
-                    date: date,
-                    timestamp: Timestamp.now()
-                });
-
-                displayStatusMessage(inventoryStatusMessage, 'Nhập kho thành công!', 'success');
-                addInventoryInForm.reset();
-                if (inventoryDateInput) { // Đặt lại ngày sau khi reset form
-                    const today = new Date();
-                    const year = today.getFullYear();
-                    const month = String(today.getMonth() + 1).padStart(2, '0');
-                    const day = String(today.getDate()).padStart(2, '0');
-                    inventoryDateInput.value = `${year}-${month}-${day}`;
-                }
-
-
-                loadProducts();
-                loadInventoryInHistory();
-                loadConsumableProducts();
-                loadDashboardSummary();
-
-            } else {
-                displayStatusMessage(inventoryStatusMessage, 'Sản phẩm không tồn tại.', 'error');
-            }
-
-        } catch (error) {
-            console.error("Lỗi khi nhập kho:", error);
-            displayStatusMessage(inventoryStatusMessage, `Lỗi khi nhập kho: ${error.message}`, 'error');
-        }
-    });
-}
-
-async function loadInventoryInHistory() {
-    if (!inventoryInHistoryTableBody) return; // Đảm bảo table body tồn tại
-
-    inventoryInHistoryTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Đang tải lịch sử nhập kho...</td></tr>';
-    try {
-        const inventoryCol = collection(db, 'inventory_in_history');
-        const q = query(inventoryCol, orderBy('timestamp', 'desc'));
-        const inventorySnapshot = await getDocs(q);
-
-        inventoryInHistoryTableBody.innerHTML = '';
-
-        if (inventorySnapshot.empty) {
-            inventoryInHistoryTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Chưa có lịch sử nhập kho.</td></tr>';
-            return;
-        }
-
-        inventorySnapshot.forEach(doc => {
-            const item = doc.data();
-            const row = inventoryInHistoryTableBody.insertRow();
-            row.setAttribute('data-id', doc.id);
-            row.innerHTML = `
-                <td>${item.date || 'N/A'}</td>
-                <td>${item.productName || 'N/A'}</td>
-                <td>${item.quantity || 0} ${item.unit || ''}</td>
-                <td>${(item.price || 0).toLocaleString('vi-VN')} VNĐ</td>
-                <td>${((item.quantity || 0) * (item.price || 0)).toLocaleString('vi-VN')} VNĐ</td>
-                <td>
-                    <button class="delete-btn btn-delete" data-id="${doc.id}"><i class="fas fa-trash-alt"></i></button>
-                </td>
-            `;
-        });
-
-        // Đã sửa selector để phù hợp với class mới: .delete-btn
-        inventoryInHistoryTableBody.querySelectorAll('.delete-btn').forEach(button => {
-            button.addEventListener('click', handleDeleteInventoryIn);
-        });
-
-    } catch (error) {
-        console.error("Lỗi khi tải lịch sử nhập kho:", error);
-        inventoryInHistoryTableBody.innerHTML = '<tr><td colspan="6" style="color:red; text-align:center;">Lỗi khi tải lịch sử nhập kho. Vui lòng kiểm tra console.</td></tr>';
-        displayStatusMessage(inventoryHistoryStatusMessage, `Lỗi khi tải lịch sử nhập kho: ${error.message}`, 'error');
-    }
-}
-
-async function handleDeleteInventoryIn(e) {
-    const inventoryId = e.currentTarget.dataset.id;
-    // Thay thế confirm() bằng modal tùy chỉnh
-    if (!confirm('Bạn có chắc chắn muốn xóa mục nhập kho này? Việc này sẽ HOÀN TÁC số lượng hàng hóa đã nhập.')) {
-        return;
-    }
-
-    try {
-        const inventoryRef = doc(db, 'inventory_in_history', inventoryId);
-        const inventorySnap = await getDoc(inventoryRef);
-
-        if (inventorySnap.exists()) {
-            const inventoryData = inventorySnap.data();
-            const productId = inventoryData.productId;
-            const quantity = inventoryData.quantity;
-
-            const productRef = doc(db, 'products', productId);
-            const productSnap = await getDoc(productRef);
-
-            if (productSnap.exists()) {
-                const productData = productSnap.data();
-                const currentStock = productData.currentStock || 0;
-                const newStock = Math.max(0, currentStock - quantity); // Đảm bảo tồn kho không âm
-
-                await updateDoc(productRef, {
-                    currentStock: newStock
-                });
-            } else {
-                console.warn('Sản phẩm liên quan đến mục nhập kho đã bị xóa hoặc không tồn tại:', productId);
-            }
-
-            await deleteDoc(inventoryRef);
-
-            displayStatusMessage(inventoryHistoryStatusMessage, 'Xóa mục nhập kho thành công và cập nhật tồn kho!', 'success');
-            loadInventoryInHistory();
-            loadProducts();
-            loadConsumableProducts();
-            loadDashboardSummary();
-
-        } else {
-            displayStatusMessage(inventoryHistoryStatusMessage, 'Không tìm thấy mục nhập kho để xóa.', 'error');
-        }
-
-    } catch (error) {
-        console.error("Lỗi khi xóa mục nhập kho:", error);
-        displayStatusMessage(inventoryHistoryStatusMessage, `Lỗi khi xóa mục nhập kho: ${error.message}`, 'error');
-    }
-}
-
-// --- Hàm Tiêu hao Hàng hóa ---
-async function loadConsumableProducts() {
-    if (!consumableProductsTableBody) return; // Đảm bảo table body tồn tại
-
-    consumableProductsTableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Đang tải danh sách hàng hóa tiêu hao...</td></tr>';
-    try {
-        const productsCol = collection(db, 'products');
-        const productSnapshot = await getDocs(productsCol);
-
-        consumableProductsTableBody.innerHTML = '';
-        if (productSnapshot.empty) {
-            consumableProductsTableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Chưa có hàng hóa để tiêu hao.</td></tr>';
-            return;
-        }
-
-        productSnapshot.forEach(doc => {
-            const product = doc.data();
-            const row = consumableProductsTableBody.insertRow();
-            row.setAttribute('data-id', doc.id);
-            row.setAttribute('data-price', product.price);
-
-            const currentStockDisplay = product.currentStock !== undefined ? product.currentStock : 'N/A';
-
-            row.innerHTML = `
-                <td>${product.name || 'N/A'}</td>
-                <td>${(product.price || 0).toLocaleString('vi-VN')} VNĐ</td>
-                <td>${currentStockDisplay} ${product.unit || ''}</td>
-                <td>
-                    <input type="number" class="consumption-input" data-product-id="${doc.id}" min="0" value="0" max="${product.currentStock || 0}">
-                </td>
-            `;
-        });
-
-    } catch (error) {
-        console.error("Lỗi khi tải hàng hóa tiêu hao:", error);
-        consumableProductsTableBody.innerHTML = '<tr><td colspan="4" style="color:red; text-align:center;">Lỗi khi tải hàng hóa tiêu hao. Vui lòng kiểm tra console.</td></tr>';
-        displayStatusMessage(consumeStatusMessage, `Lỗi khi tải hàng hóa tiêu hao: ${error.message}`, 'error');
-    }
-}
-
-if (saveConsumptionButton) {
-    saveConsumptionButton.addEventListener('click', async () => {
-        const consumptionInputs = document.querySelectorAll('.consumption-input');
-        const updates = [];
-        let hasError = false;
-        let errorMessageAccumulator = '';
-
-        const today = new Date().toISOString().slice(0, 10);
-
-        try {
-            for (const input of consumptionInputs) {
-                const productId = input.dataset.productId;
-                const quantityConsumed = parseInt(input.value);
-                const productPrice = parseFloat(input.closest('tr').dataset.price);
-
-                if (isNaN(quantityConsumed) || quantityConsumed <= 0) {
-                    continue; // Bỏ qua nếu số lượng không hợp lệ hoặc bằng 0
-                }
-
-                const productRef = doc(db, 'products', productId);
-                const productSnap = await getDoc(productRef);
-
-                if (productSnap.exists()) {
-                    const productData = productSnap.data();
-                    const currentStock = productData.currentStock || 0;
-
-                    if (quantityConsumed > currentStock) {
-                        errorMessageAccumulator += `Số lượng tiêu hao của <strong>${productData.name}</strong> (${quantityConsumed}) vượt quá tồn kho thực tế (${currentStock}). Vui lòng điều chỉnh.<br>`;
-                        hasError = true;
-                        continue; // Bỏ qua sản phẩm này nhưng tiếp tục xử lý các sản phẩm khác
-                    }
-
-                    const newStock = currentStock - quantityConsumed;
-                    const revenueGenerated = quantityConsumed * productPrice;
-
-                    updates.push(updateDoc(productRef, {
-                        currentStock: newStock
-                    }));
-
-                    // Kiểm tra giao dịch hàng ngày hiện có cho sản phẩm và ngày này
-                    const transactionQuery = query(
-                        collection(db, 'daily_transactions'),
-                        where('date', '==', today),
-                        where('productId', '==', productId)
-                    );
-                    const transactionSnap = await getDocs(transactionQuery);
-
-                    if (!transactionSnap.empty) {
-                        const transactionDoc = transactionSnap.docs[0];
-                        const existingData = transactionDoc.data();
-                        updates.push(updateDoc(doc(db, 'daily_transactions', transactionDoc.id), {
-                            quantityConsumed: (existingData.quantityConsumed || 0) + quantityConsumed,
-                            revenue: (existingData.revenue || 0) + revenueGenerated
-                        }));
-                    } else {
-                        updates.push(addDoc(collection(db, 'daily_transactions'), {
-                            date: today,
-                            productId: productId,
-                            productName: productData.name,
-                            quantityConsumed: quantityConsumed,
-                            revenue: revenueGenerated,
-                            timestamp: Timestamp.now() // Thêm timestamp để sắp xếp và truy vấn tốt hơn
-                        }));
-                    }
-                } else {
-                    console.warn(`Sản phẩm với ID ${productId} không tồn tại khi lưu tiêu hao.`);
-                    errorMessageAccumulator += `Sản phẩm với ID ${productId} không tồn tại khi lưu tiêu hao.<br>`;
-                    hasError = true;
-                    continue;
-                }
-            }
-
-            if (hasError) {
-                displayStatusMessage(consumeStatusMessage, `<strong>Lỗi:</strong><br>${errorMessageAccumulator}`, 'error');
-            } else if (updates.length > 0) {
-                await Promise.all(updates);
-                displayStatusMessage(consumeStatusMessage, 'Cập nhật tiêu hao hàng hóa thành công!', 'success');
-                loadConsumableProducts();
-                loadProducts();
-                loadDashboardSummary();
-            } else {
-                displayStatusMessage(consumeStatusMessage, 'Không có số lượng tiêu hao nào được nhập hoặc tất cả đều bằng 0.', 'error');
-            }
-
-        } catch (error) {
-            console.error("Lỗi khi lưu tiêu hao:", error);
-            displayStatusMessage(consumeStatusMessage, `Lỗi khi lưu tiêu hao: ${error.message}`, 'error');
-        }
-    });
-}
-
-// --- Hàm Báo cáo ---
-function setupReportFilters() {
-    // Đặt giá trị mặc định cho các bộ lọc ngày
-    if (reportDailyDateInput) reportDailyDateInput.value = new Date().toISOString().slice(0, 10);
-    const today = new Date();
-    if (reportMonthInput) reportMonthInput.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-    if (reportYearInput) reportYearInput.value = today.getFullYear().toString();
-
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(today.getDate() - 29);
-    if (profitInventoryInStartDateInput) profitInventoryInStartDateInput.value = thirtyDaysAgo.toISOString().slice(0, 10);
-    if (profitInventoryInEndDateInput) profitInventoryInEndDateInput.value = today.toISOString().slice(0, 10);
-    if (profitConsumeStartDateInput) profitConsumeStartDateInput.value = thirtyDaysAgo.toISOString().slice(0, 10);
-    if (profitConsumeEndDateInput) profitConsumeEndDateInput.value = today.toISOString().slice(0, 10);
-
-    if (reportTypeSelect) {
-        reportTypeSelect.addEventListener('change', () => {
-            const type = reportTypeSelect.value;
-            // Ẩn tất cả các bộ lọc trước
-            const dailyFilter = document.getElementById('dailyReportFilter');
-            const monthlyFilter = document.getElementById('monthlyReportFilter');
-            const yearlyFilter = document.getElementById('yearlyReportFilter');
-            const dateRangeFilter = document.getElementById('dateRangeReportFilter');
-
-            if (dailyFilter) dailyFilter.classList.add('hidden');
-            if (monthlyFilter) monthlyFilter.classList.add('hidden');
-            if (yearlyFilter) yearlyFilter.classList.add('hidden');
-            if (dateRangeFilter) dateRangeFilter.classList.add('hidden');
-            if (profitReportFilter) profitReportFilter.classList.add('hidden');
-
-            // Hiển thị bộ lọc tương ứng
-            if (type === 'daily' && dailyFilter) {
-                dailyFilter.classList.remove('hidden');
-            } else if (type === 'monthly' && monthlyFilter) {
-                monthlyFilter.classList.remove('hidden');
-            } else if (type === 'yearly' && yearlyFilter) {
-                yearlyFilter.classList.remove('hidden');
-            } else if (type === 'dateRange' && dateRangeFilter) {
-                dateRangeFilter.classList.remove('hidden');
-            } else if (type === 'profit' && profitReportFilter) {
-                profitReportFilter.classList.remove('hidden');
-            }
-        });
-
-        // Kích hoạt sự kiện change để đặt trạng thái ban đầu
-        reportTypeSelect.dispatchEvent(new Event('change'));
-    }
 }
 
 if (generateReportButton) {
     generateReportButton.addEventListener('click', async () => {
-        const reportType = reportTypeSelect.value;
-        if (reportContent) reportContent.innerHTML = '<p style="text-align:center; color:#666;">Đang tạo báo cáo...</p>';
+        const reportPeriod = reportPeriodSelect ? reportPeriodSelect.value : null;
+        let startDate = null;
+        let endDate = null;
 
-        try {
-            if (reportType === 'profit') {
-                // Logic cho báo cáo lợi nhuận được xử lý bởi nút riêng generateProfitReportBtn
-                if (reportContent) reportContent.innerHTML = '<p style="text-align:center; color:#666;">Vui lòng sử dụng nút "Tạo Báo cáo Lợi nhuận" riêng.</p>';
+        if (reportPeriod === 'custom') {
+            startDate = reportStartDateInput ? reportStartDateInput.value : null;
+            endDate = reportEndDateInput ? reportEndDateInput.value : null;
+            if (!startDate || !endDate) {
+                displayStatusMessage(reportsSection, 'Vui lòng chọn đầy đủ ngày bắt đầu và ngày kết thúc cho báo cáo tùy chỉnh.', 'error');
+                if (profitReportContent) profitReportContent.innerHTML = '';
                 return;
-            } else {
-                let transactions = [];
-                const transactionsCol = collection(db, 'daily_transactions');
-                let q;
-
-                if (reportType === 'daily') {
-                    const selectedDate = reportDailyDateInput.value;
-                    if (!selectedDate) {
-                        if (reportContent) reportContent.innerHTML = '<p style="color:red; text-align:center;">Vui lòng chọn ngày cho báo cáo ngày.</p>';
-                        return;
-                    }
-                    q = query(transactionsCol, where('date', '==', selectedDate));
-                } else if (reportType === 'monthly') {
-                    const selectedMonth = reportMonthInput.value;
-                    if (!selectedMonth) {
-                        if (reportContent) reportContent.innerHTML = '<p style="color:red; text-align:center;">Vui lòng chọn tháng cho báo cáo tháng.</p>';
-                        return;
-                    }
-                    const startDate = `${selectedMonth}-01`;
-                    const year = parseInt(selectedMonth.substring(0, 4));
-                    const month = parseInt(selectedMonth.substring(5, 7));
-                    const lastDay = new Date(year, month, 0).getDate();
-                    const endDate = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
-
-                    q = query(transactionsCol, where('date', '>=', startDate), where('date', '<=', endDate), orderBy('date'));
-                } else if (reportType === 'yearly') {
-                    const selectedYear = reportYearInput.value;
-                    if (!selectedYear) {
-                        if (reportContent) reportContent.innerHTML = '<p style="color:red; text-align:center;">Vui lòng chọn năm cho báo cáo năm.</p>';
-                        return;
-                    }
-                    const startDate = `${selectedYear}-01-01`;
-                    const endDate = `${selectedYear}-12-31`;
-                    q = query(transactionsCol, where('date', '>=', startDate), where('date', '<=', endDate), orderBy('date'));
-                } else if (reportType === 'dateRange') {
-                    const startDate = reportStartDateInput.value;
-                    const endDate = reportEndDateInput.value;
-                    if (!startDate || !endDate) {
-                        if (reportContent) reportContent.innerHTML = '<p style="color:red; text-align:center;">Vui lòng chọn đầy đủ khoảng ngày cho báo cáo.</p>';
-                        return;
-                    }
-                    if (new Date(startDate) > new Date(endDate)) {
-                        if (reportContent) reportContent.innerHTML = '<p style="color:red; text-align:center;">Ngày bắt đầu không thể lớn hơn ngày kết thúc.</p>';
-                        return;
-                    }
-                    q = query(transactionsCol, where('date', '>=', startDate), where('date', '<=', endDate), orderBy('date'));
-                } else {
-                    if (reportContent) reportContent.innerHTML = '<p style="color:red; text-align:center;">Vui lòng chọn loại báo cáo.</p>';
-                    return;
-                }
-
-                const querySnapshot = await getDocs(q);
-                transactions = querySnapshot.docs.map(doc => doc.data());
-                renderReport(reportType, transactions);
             }
+        }
 
-        } catch (error) {
-            console.error("Lỗi khi tạo báo cáo:", error);
-            if (reportContent) reportContent.innerHTML = `<p style="color:red; text-align:center;">Lỗi khi tạo báo cáo: ${error.message}</p>`;
+        if (reportPeriod) {
+            await generateRevenueReport(reportPeriod, { startDate, endDate });
+        } else {
+            displayStatusMessage(reportsSection, 'Vui lòng chọn loại báo cáo hợp lệ.', 'error');
+            if (profitReportContent) profitReportContent.innerHTML = '';
         }
     });
 }
 
-function renderReport(reportType, transactions) {
-    if (!reportContent) return; // Đảm bảo reportContent tồn tại
-
-    if (transactions.length === 0) {
-        reportContent.innerHTML = '<p style="text-align:center; color:#666;">Không có dữ liệu cho báo cáo này.</p>';
-        return;
+// Khởi tạo trạng thái ban đầu của Dashboard khi tải trang
+document.addEventListener('DOMContentLoaded', async () => {
+    // Đảm bảo các phần tử DOM quan trọng đã được lấy
+    if (dashboardSection) {
+        showSection(dashboardSection, 'Tổng quan Kho hàng');
+        await loadDashboardKPIs();
+    } else {
+        console.error("Dashboard section not found.");
     }
 
-    let reportHtml = '';
-    let totalRevenue = 0;
-    let totalQuantity = 0;
-
-    const reportTitle = reportType === 'daily' ? 'Ngày' : reportType === 'monthly' ? 'Tháng' : reportType === 'yearly' ? 'Năm' : 'Khoảng ngày';
-    reportHtml += `<h3>Báo cáo Doanh thu (${reportTitle})</h3>`;
-    reportHtml += `<div class="data-table-wrapper"><table class="data-table"><thead><tr><th>Ngày</th><th>Tên Hàng Hóa</th><th>Số lượng tiêu hao</th><th>Doanh thu</th></tr></thead><tbody>`;
-
-    // Sắp xếp giao dịch theo ngày để báo cáo dễ đọc hơn
-    transactions.sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateA - dateB;
-    });
-
-    transactions.forEach(item => {
-        reportHtml += `
-            <tr>
-                <td>${item.date || 'N/A'}</td>
-                <td>${item.productName || 'N/A'}</td>
-                <td>${item.quantityConsumed || 0}</td>
-                <td>${(item.revenue || 0).toLocaleString('vi-VN')} VNĐ</td>
-            </tr>
-        `;
-        totalRevenue += item.revenue || 0;
-        totalQuantity += item.quantityConsumed || 0;
-    });
-
-    reportHtml += `</tbody><tfoot><tr><td colspan="2" style="text-align:right; font-weight:bold;">Tổng cộng:</td><td>${totalQuantity}</td><td>${totalRevenue.toLocaleString('vi-VN')} VNĐ</td></tr></tfoot></table></div>`;
-    reportContent.innerHTML = reportHtml;
-}
-
-// Hàm tạo Báo cáo Lợi nhuận
-if (generateProfitReportBtn) {
-    generateProfitReportBtn.addEventListener('click', async () => {
-        if (profitReportContent) profitReportContent.innerHTML = '<p style="text-align:center; color:#666;">Đang tạo báo cáo lợi nhuận...</p>';
-
-        const invInStartDate = profitInventoryInStartDateInput.value;
-        const invInEndDate = profitInventoryInEndDateInput.value;
-        const consumeStartDate = profitConsumeStartDateInput.value;
-        const consumeEndDate = profitConsumeEndDateInput.value;
-
-        if (!invInStartDate || !invInEndDate || !consumeStartDate || !consumeEndDate) {
-            if (profitReportContent) profitReportContent.innerHTML = '<p style="color:red; text-align:center;">Vui lòng chọn đầy đủ các khoảng ngày cho báo cáo lợi nhuận.</p>';
-            return;
-        }
-
-        if (new Date(invInStartDate) > new Date(invInEndDate) || new Date(consumeStartDate) > new Date(consumeEndDate)) {
-            if (profitReportContent) profitReportContent.innerHTML = '<p style="color:red; text-align:center;">Ngày bắt đầu không thể lớn hơn ngày kết thúc trong bất kỳ khoảng thời gian nào.</p>';
-            return;
-        }
-
-        let totalInventoryInCost = 0;
-        let totalRevenueFromConsumption = 0;
-
-        try {
-            const inventoryInCol = collection(db, 'inventory_in_history');
-            const qInvIn = query(
-                inventoryInCol,
-                where('date', '>=', invInStartDate),
-                where('date', '<=', invInEndDate)
-            );
-            const invInSnapshot = await getDocs(qInvIn);
-
-            invInSnapshot.forEach(doc => {
-                const item = doc.data();
-                totalInventoryInCost += (item.quantity || 0) * (item.price || 0);
-            });
-
-            const transactionsCol = collection(db, 'daily_transactions');
-            const qConsume = query(
-                transactionsCol,
-                where('date', '>=', consumeStartDate),
-                where('date', '<=', consumeEndDate)
-            );
-            const consumeSnapshot = await getDocs(qConsume);
-
-            consumeSnapshot.forEach(doc => {
-                const transaction = doc.data();
-                totalRevenueFromConsumption += (transaction.revenue || 0);
-            });
-
-            const netProfit = totalRevenueFromConsumption - totalInventoryInCost;
-
-            renderProfitReport(totalInventoryInCost, totalRevenueFromConsumption, netProfit, invInStartDate, invInEndDate, consumeStartDate, consumeEndDate);
-
-        } catch (error) {
-            console.error("Lỗi khi tạo báo cáo lợi nhuận:", error);
-            if (profitReportContent) profitReportContent.innerHTML = `<p style="color:red; text-align:center;">Lỗi khi tạo báo cáo lợi nhuận: ${error.message}</p>`;
-        }
-    });
-}
-
-
-function renderProfitReport(totalInventoryInCost, totalRevenueFromConsumption, netProfit, invInStartDate, invInEndDate, consumeStartDate, consumeEndDate) {
-    if (!profitReportContent) return; // Đảm bảo profitReportContent tồn tại
-
-    let reportHtml = `
-        <h3>Báo cáo Lợi nhuận</h3>
-        <p><strong>Khoảng thời gian nhập kho:</strong> từ ${invInStartDate} đến ${invInEndDate}</p>
-        <p><strong>Khoảng thời gian tiêu hao (doanh thu):</strong> từ ${consumeStartDate} đến ${consumeEndDate}</p>
-        <div class="summary-cards-profit">
-            <div class="summary-card">
-                <h3>Tổng chi phí nhập kho</h3>
-                <p style="color: #d73a49;">${totalInventoryInCost.toLocaleString('vi-VN')} VNĐ</p>
-            </div>
-            <div class="summary-card">
-                <h3>Tổng doanh thu từ tiêu hao</h3>
-                <p style="color: #28a745;">${totalRevenueFromConsumption.toLocaleString('vi-VN')} VNĐ</p>
-            </div>
-            <div class="summary-card">
-                <h3>Lợi nhuận ròng</h3>
-                <p style="color: ${netProfit >= 0 ? '#28a745' : '#d73a49'};">${netProfit.toLocaleString('vi-VN')} VNĐ</p>
-            </div>
-        </div>
-        <p style="margin-top: 20px; font-style: italic; color: #586069;">
-            Lợi nhuận được tính bằng: Tổng doanh thu từ tiêu hao - Tổng chi phí nhập kho.
-            Lưu ý: Đây là báo cáo lợi nhuận đơn giản dựa trên tổng chi phí nhập kho và tổng doanh thu tiêu hao trong các khoảng thời gian đã chọn, không phải là tính toán giá vốn hàng bán theo phương pháp kế toán.
-        </p>
-    `;
-    profitReportContent.innerHTML = reportHtml;
-}
-
-
-// --- Khởi tạo Dashboard khi DOM đã tải ---
-// Sử dụng DOMContentLoaded để đảm bảo tất cả HTML đã sẵn sàng
-document.addEventListener('DOMContentLoaded', () => {
-    // Chỉ khởi tạo dashboard nếu đang ở trang dashboard.html
-    // (auth.js đã xử lý việc chuyển hướng đến đây)
-    if (window.location.pathname.endsWith('/dashboard.html') || window.location.pathname === '/') {
-        initializeDashboard();
+    // Các thiết lập ban đầu cho các phần khác
+    // Đảm bảo reportPeriodSelect tồn tại trước khi gọi setupReportFilters
+    if (navReports && reportPeriodSelect) {
+        setupReportFilters();
     }
-    // Kích hoạt sự kiện resize để điều chỉnh sidebar ban đầu
-    window.dispatchEvent(new Event('resize'));
 });
+
+// Chức năng Đăng xuất (giữ nguyên nhưng không có logic firebase auth)
+if (navLogout) {
+    navLogout.addEventListener('click', (e) => {
+        e.preventDefault();
+        alert('Bạn đã đăng xuất.'); // Hoặc chuyển hướng đến trang đăng nhập
+        // window.location.href = 'index.html'; // Chuyển hướng đến trang đăng nhập
+    });
+}
+
+// Chức năng Cài đặt (placeholder)
+if (navSettings) {
+    navSettings.addEventListener('click', (e) => {
+        e.preventDefault();
+        showSection(settingsSection, 'Cài đặt');
+    });
+}
